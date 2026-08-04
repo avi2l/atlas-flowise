@@ -2,12 +2,12 @@
 
 ## Pinned upstream baseline
 
-- **Upstream:** https://github.com/FlowiseAI/Flowise
-- **Atlas fork:** https://github.com/avi2l/atlas-flowise
-- **Pinned release:** `flowise@2.2.7`
-- **Pinned commit:** `cf7d841f88504bba465790eb906f6d758b91ee2c`
-- **Working branch:** `atlas/pinned-flowise-2.2.7`
-- **Pinned on:** 2026-08-03
+-   **Upstream:** https://github.com/FlowiseAI/Flowise
+-   **Atlas fork:** https://github.com/avi2l/atlas-flowise
+-   **Pinned release:** `flowise@2.2.7`
+-   **Pinned commit:** `cf7d841f88504bba465790eb906f6d758b91ee2c`
+-   **Baseline branch:** `atlas/pinned-flowise-2.2.7`
+-   **Pinned on:** 2026-08-03
 
 ## Why this baseline
 
@@ -26,6 +26,16 @@ than following upstream `main` automatically.
 4. Treat Flowise as an isolated workflow/canvas runtime behind Atlas-owned APIs.
 5. Record every accepted upstream cherry-pick in this file with source commit,
    rationale, and license review.
+
+## Inherited automation review gate
+
+The pinned upstream tree includes `autoSyncSingleCommit.yml` and
+`autoSyncMergedPullRequest.yml`. They were inherited unchanged and were not
+run, configured, or relied upon by the Atlas Phase-0 work. Before any use of
+the fork's GitHub Actions on an Atlas-owned branch, review their external
+repository-dispatch behavior, secrets, privileges, and `pull_request_target`
+trigger as a separate security decision. This policy does not authorize an
+automatic upstream synchronization.
 
 ## Initial scope
 

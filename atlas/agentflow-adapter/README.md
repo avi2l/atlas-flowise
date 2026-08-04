@@ -19,10 +19,10 @@ records.
 
 ## Explicit non-goals
 
-- No Flowise route, UI, database entity, migration, or runtime change.
-- No Atlas identity, authorization, permissions, secrets, production data, or
-  external service configuration.
-- No transport, retry, webhook, event-outbox, streaming, or deployment path.
+-   No Flowise route, UI, database entity, migration, or runtime change.
+-   No Atlas identity, authorization, permissions, secrets, production data, or
+    external service configuration.
+-   No transport, retry, webhook, event-outbox, streaming, or deployment path.
 
 ## Gate for a future transport
 
