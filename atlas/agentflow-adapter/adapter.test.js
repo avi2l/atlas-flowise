@@ -86,8 +86,14 @@ test('adapter source is verified before the test process loads it', () => {
 
 test('adapter source validation is installed before any test can load the adapter', () => {
     const testSource = fs.readFileSync(__filename, 'utf8')
+    const validationInvocation = 'assertAdapterSourcesAreSafe()\n\nfunction loadVerifiedAdapter'
 
-    assert.ok(testSource.indexOf('assertAdapterSourcesAreSafe()') < testSource.indexOf("test('adapter source is verified"))
+    assert.ok(testSource.indexOf(validationInvocation) < testSource.indexOf("test('adapter source is verified"))
+})
+
+test('Phase 0 documentation defers permissive Flowise browser controls to private ingress', () => {
+    assert.match(phaseZeroDocumentationSource, /CORS_ORIGINS/)
+    assert.match(phaseZeroDocumentationSource, /IFRAME_ORIGINS/)
 })
 
 test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
