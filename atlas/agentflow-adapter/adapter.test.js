@@ -51,6 +51,23 @@ function assertAdapterSourcesAreSafe() {
     assert.match(adapterSources[0].source, /const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object\.freeze\(\[\]\)/)
 }
 
+function assertValidationInvocationRunsBeforeAdapterLoads(source) {
+    const normalizedSource = source.replace(/\r\n/g, '\n')
+    const validationInvocation = 'assertAdapterSourcesAreSafe()\n\nfunction loadVerifiedAdapter'
+    const validationOffset = normalizedSource.indexOf(validationInvocation)
+    const adapterLoadOffset = normalizedSource.lastIndexOf('function loadVerifiedAdapter')
+
+    assert.notEqual(validationOffset, -1)
+    assert.notEqual(adapterLoadOffset, -1)
+    assert.ok(validationOffset < adapterLoadOffset)
+}
+
+test('validation placement check accepts a CRLF-encoded source when validation precedes loading', () => {
+    const source = "assertAdapterSourcesAreSafe()\r\n\r\nfunction loadVerifiedAdapter() {}"
+
+    assert.doesNotThrow(() => assertValidationInvocationRunsBeforeAdapterLoads(source))
+})
+
 assertAdapterSourcesAreSafe()
 
 function loadVerifiedAdapter() {
@@ -85,10 +102,7 @@ test('adapter source is verified before the test process loads it', () => {
 })
 
 test('adapter source validation is installed before any test can load the adapter', () => {
-    const testSource = fs.readFileSync(__filename, 'utf8')
-    const validationInvocation = 'assertAdapterSourcesAreSafe()\n\nfunction loadVerifiedAdapter'
-
-    assert.ok(testSource.indexOf(validationInvocation) < testSource.indexOf("test('adapter source is verified"))
+    assertValidationInvocationRunsBeforeAdapterLoads(fs.readFileSync(__filename, 'utf8'))
 })
 
 test('Phase 0 documentation defers permissive Flowise browser controls to private ingress', () => {
