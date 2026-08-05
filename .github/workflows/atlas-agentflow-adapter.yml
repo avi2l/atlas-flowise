@@ -2,9 +2,11 @@ name: Atlas AgentFlow Adapter Boundary
 
 on:
     pull_request:
-        paths:
+        paths: &adapter-boundary-paths
             - 'atlas/agentflow-adapter/**'
             - '.github/workflows/atlas-agentflow-adapter.yml'
+    push:
+        paths: *adapter-boundary-paths
 
 permissions:
     contents: read

@@ -8,8 +8,9 @@ const assert = require('node:assert/strict')
 const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_ADAPTER_DEPENDENCIES } = require('./adapter')
 
 const adapterSource = fs.readFileSync(path.join(__dirname, 'adapter.js'), 'utf8')
+const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 
-const prohibitedRuntimeAccess = /\b(?:require|import|process|globalThis)\b|\bfetch\s*\(|\b(?:fs|http|https|net|tls|child_process)\s*\./
+const prohibitedRuntimeAccess = /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\s*\(|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function inaccessibleRequest() {
     return new Proxy(
@@ -40,6 +41,15 @@ test('no-I/O boundary check rejects global runtime capabilities', () => {
     assert.match('globalThis.process.env.ATLAS_TOKEN', prohibitedRuntimeAccess)
     assert.match('const { env } = process', prohibitedRuntimeAccess)
     assert.match("require('node:dns').lookup('example.invalid')", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects dynamic code evaluation', () => {
+    assert.match("eval('arbitrary code')", prohibitedRuntimeAccess)
+    assert.match("new Function('return arbitraryValue')", prohibitedRuntimeAccess)
+})
+
+test('adapter boundary workflow also runs on matching pushes', () => {
+    assert.match(adapterWorkflowSource, /push:/)
 })
 
 test('non-production adapter rejects run requests without inspecting caller data', async () => {
