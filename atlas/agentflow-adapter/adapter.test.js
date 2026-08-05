@@ -16,7 +16,7 @@ function collectAdapterSources(directory, rootDirectory = directory) {
             sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory))
         } else if (
             entry.isFile() &&
-            /\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name) &&
+            /\.(?:js|cjs|mjs|jsx|ts|tsx|json)$/.test(entry.name) &&
             !/\.test\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name)
         ) {
             sourceFiles.push({
@@ -93,7 +93,8 @@ test('adapter source collector covers nested JavaScript module variants', () => 
             'nested/helper.mjs',
             'nested/helper.ts',
             'nested/helper.jsx',
-            'nested/helper.tsx'
+            'nested/helper.tsx',
+            'nested/package.json'
         ]) {
             fs.writeFileSync(path.join(fixtureDirectory, relativePath), "'use strict'\n")
         }
@@ -102,7 +103,15 @@ test('adapter source collector covers nested JavaScript module variants', () => 
             collectAdapterSources(fixtureDirectory)
                 .map(({ name }) => name)
                 .sort(),
-            ['adapter.js', 'nested/helper.cjs', 'nested/helper.jsx', 'nested/helper.mjs', 'nested/helper.ts', 'nested/helper.tsx']
+            [
+                'adapter.js',
+                'nested/helper.cjs',
+                'nested/helper.jsx',
+                'nested/helper.mjs',
+                'nested/helper.ts',
+                'nested/helper.tsx',
+                'nested/package.json'
+            ]
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
