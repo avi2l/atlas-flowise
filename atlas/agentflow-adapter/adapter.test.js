@@ -79,8 +79,21 @@ test('no-I/O boundary check rejects dynamic code evaluation', () => {
     assert.match("new Function('return arbitraryValue')", prohibitedRuntimeAccess)
 })
 
-test('adapter boundary workflow also runs on matching pushes', () => {
-    assert.match(adapterWorkflowSource, /push:/)
+test('adapter boundary workflow has explicit pull-request and push containment paths', () => {
+    assert.doesNotMatch(adapterWorkflowSource, /^\s*paths:\s*[&*]/m)
+
+    for (const protectedPath of [
+        "- 'atlas/agentflow-adapter/**'",
+        "- '.github/workflows/atlas-agentflow-adapter.yml'",
+        "- '.dockerignore'"
+    ]) {
+        assert.equal(adapterWorkflowSource.split(protectedPath).length - 1, 2)
+    }
+
+    assert.match(adapterWorkflowSource, /pull_request:\n        paths:/)
+    assert.match(adapterWorkflowSource, /push:\n        paths:/)
+    assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
+    assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
 })
 
 test('non-production adapter rejects run requests without inspecting caller data', async () => {
