@@ -63,7 +63,7 @@ function assertValidationInvocationRunsBeforeAdapterLoads(source) {
 }
 
 test('validation placement check accepts a CRLF-encoded source when validation precedes loading', () => {
-    const source = "assertAdapterSourcesAreSafe()\r\n\r\nfunction loadVerifiedAdapter() {}"
+    const source = 'assertAdapterSourcesAreSafe()\r\n\r\nfunction loadVerifiedAdapter() {}'
 
     assert.doesNotThrow(() => assertValidationInvocationRunsBeforeAdapterLoads(source))
 })
