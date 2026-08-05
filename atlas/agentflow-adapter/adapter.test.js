@@ -6,8 +6,6 @@ const path = require('node:path')
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_ADAPTER_DEPENDENCIES } = require('./adapter')
-
 function collectAdapterSources(directory, rootDirectory = directory) {
     const sourceFiles = []
 
@@ -16,7 +14,7 @@ function collectAdapterSources(directory, rootDirectory = directory) {
 
         if (entry.isDirectory()) {
             sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory))
-        } else if (entry.isFile() && /\.(?:js|cjs|mjs|ts)$/.test(entry.name) && !/\.test\.(?:js|cjs|mjs|ts)$/.test(entry.name)) {
+        } else if (entry.isFile() && /\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name) && !/\.test\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name)) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
                 source: fs.readFileSync(entryPath, 'utf8')
@@ -35,6 +33,10 @@ const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerig
 
 const prohibitedRuntimeAccess =
     /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
+
+function loadVerifiedAdapter() {
+    return require('./adapter')
+}
 
 function inaccessibleRequest() {
     return new Proxy(
@@ -59,8 +61,11 @@ function inaccessibleRequest() {
     )
 }
 
+test('adapter source is verified before the test process loads it', () => {
+    assert.equal(require.cache[require.resolve('./adapter')], undefined)
+})
+
 test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
-    assert.deepEqual(NON_PRODUCTION_ADAPTER_DEPENDENCIES, [])
     assert.deepEqual(
         adapterSources.map(({ name }) => name),
         ['adapter.js']
@@ -69,6 +74,8 @@ test('non-production adapter has an explicit dependency-free, no-I/O boundary', 
     for (const { source } of adapterSources) {
         assert.doesNotMatch(source, prohibitedRuntimeAccess)
     }
+
+    assert.match(adapterSources[0].source, /const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object\.freeze\(\[\]\)/)
 })
 
 test('adapter source collector covers nested JavaScript module variants', () => {
@@ -76,7 +83,7 @@ test('adapter source collector covers nested JavaScript module variants', () => 
 
     try {
         fs.mkdirSync(path.join(fixtureDirectory, 'nested'))
-        for (const relativePath of ['adapter.js', 'nested/helper.cjs', 'nested/helper.mjs', 'nested/helper.ts']) {
+        for (const relativePath of ['adapter.js', 'nested/helper.cjs', 'nested/helper.mjs', 'nested/helper.ts', 'nested/helper.jsx', 'nested/helper.tsx']) {
             fs.writeFileSync(path.join(fixtureDirectory, relativePath), "'use strict'\n")
         }
 
@@ -84,7 +91,7 @@ test('adapter source collector covers nested JavaScript module variants', () => 
             collectAdapterSources(fixtureDirectory)
                 .map(({ name }) => name)
                 .sort(),
-            ['adapter.js', 'nested/helper.cjs', 'nested/helper.mjs', 'nested/helper.ts']
+            ['adapter.js', 'nested/helper.cjs', 'nested/helper.jsx', 'nested/helper.mjs', 'nested/helper.ts', 'nested/helper.tsx']
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
@@ -145,14 +152,22 @@ test('Phase 0 documentation does not preserve a stale contract-test count', () =
     assert.doesNotMatch(phaseZeroDocumentationSource, /# \d+ pass, \d+ fail/)
 })
 
+test('Phase 0 documentation defers tenancy, resource, and queue containment decisions', () => {
+    assert.match(phaseZeroDocumentationSource, /shared Flowise instance/i)
+    assert.match(phaseZeroDocumentationSource, /resource exhaustion/i)
+    assert.match(phaseZeroDocumentationSource, /queue mode/i)
+})
+
 test('root container build context excludes the non-production adapter', () => {
     assert.match(dockerIgnoreSource, /^atlas\/$/m)
     assert.doesNotMatch(dockerIgnoreSource, /^!atlas(?:\/|$)/m)
 })
 
 test('non-production adapter rejects construction and run arguments without inspecting caller data', async () => {
+    const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_ADAPTER_DEPENDENCIES } = loadVerifiedAdapter()
     const adapter = createNonProductionAdapter(inaccessibleRequest(), inaccessibleRequest())
 
+    assert.deepEqual(NON_PRODUCTION_ADAPTER_DEPENDENCIES, [])
     assert.equal(adapter.enabled, false)
     await assert.rejects(adapter.run(inaccessibleRequest(), inaccessibleRequest()), (error) => {
         assert.equal(error instanceof NonProductionAdapterError, true)
@@ -163,6 +178,7 @@ test('non-production adapter rejects construction and run arguments without insp
 })
 
 test('non-production adapter rejects construction and abort arguments without inspecting caller data', async () => {
+    const { createNonProductionAdapter, NonProductionAdapterError } = loadVerifiedAdapter()
     const adapter = createNonProductionAdapter(inaccessibleRequest(), inaccessibleRequest())
 
     await assert.rejects(adapter.abort(inaccessibleRequest(), inaccessibleRequest()), (error) => {

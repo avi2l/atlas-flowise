@@ -106,6 +106,17 @@ Do **not** implement a transport until Atlas approves all of the following:
 9. Ownership and cadence or advisory triggers for security review of the frozen
    Flowise `2.2.7` release and its dependencies, without permitting automatic
    upstream synchronization.
+10. Whether a shared Flowise instance is permitted or whether an instance must
+    be isolated per tenant or trust domain. The decision must account for
+    Flowise-internal chatflow definitions, credential store, uploads, chat
+    messages, and tool reachability; Atlas-layer authorization alone does not
+    partition that state.
+11. Resource exhaustion and cost controls owned by Atlas and private ingress:
+    concurrency, execution timeouts, rate limits, payload and upload limits,
+    and model-spend bounds.
+12. Whether queue mode is enabled. If it is, Redis or any equivalent queue/data
+    store is an additional contained data path subject to the same retention,
+    redaction, access-control, and operational-ownership decisions.
 
 These are architecture decisions with security impact. Their absence is why
 this Phase-0 adapter stays disabled. The inherited repository-dispatch
