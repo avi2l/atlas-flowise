@@ -1,0 +1,21 @@
+name: Atlas AgentFlow Adapter Boundary
+
+on:
+    pull_request:
+        paths:
+            - 'atlas/agentflow-adapter/**'
+            - '.github/workflows/atlas-agentflow-adapter.yml'
+
+permissions:
+    contents: read
+
+jobs:
+    adapter-contract:
+        name: Disabled adapter contract
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+            - run: node --test atlas/agentflow-adapter/adapter.test.js
