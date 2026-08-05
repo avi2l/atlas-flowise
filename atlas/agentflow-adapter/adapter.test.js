@@ -14,7 +14,11 @@ function collectAdapterSources(directory, rootDirectory = directory) {
 
         if (entry.isDirectory()) {
             sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory))
-        } else if (entry.isFile() && /\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name) && !/\.test\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name)) {
+        } else if (
+            entry.isFile() &&
+            /\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name) &&
+            !/\.test\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name)
+        ) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
                 source: fs.readFileSync(entryPath, 'utf8')
@@ -83,7 +87,14 @@ test('adapter source collector covers nested JavaScript module variants', () => 
 
     try {
         fs.mkdirSync(path.join(fixtureDirectory, 'nested'))
-        for (const relativePath of ['adapter.js', 'nested/helper.cjs', 'nested/helper.mjs', 'nested/helper.ts', 'nested/helper.jsx', 'nested/helper.tsx']) {
+        for (const relativePath of [
+            'adapter.js',
+            'nested/helper.cjs',
+            'nested/helper.mjs',
+            'nested/helper.ts',
+            'nested/helper.jsx',
+            'nested/helper.tsx'
+        ]) {
             fs.writeFileSync(path.join(fixtureDirectory, relativePath), "'use strict'\n")
         }
 
