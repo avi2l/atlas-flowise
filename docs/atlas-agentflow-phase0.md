@@ -2,9 +2,11 @@
 
 **Status:** reconnaissance complete; adapter remains deliberately disabled.
 **Scope:** Flowise `2.2.7`, pinned at `cf7d841f88504bba465790eb906f6d758b91ee2c`.
-No upstream synchronization, package upgrade, deployment, credential import,
-production-data access, database change, or identity/security architecture
-change was performed.
+No upstream synchronization, package upgrade, external deployment, credential
+import, production-data access, database change, or identity/security architecture
+change was performed. Inherited repository CI can start local Flowise and Docker
+build jobs without Atlas credentials or production data; this work did not add,
+run, or configure those jobs.
 
 This document records engineering observations, not an authorization to connect
 Atlas to Flowise.
@@ -120,7 +122,7 @@ fail-closed implementation, the contract test passed:
 
 ```text
 node --test atlas/agentflow-adapter/adapter.test.js
-# 4 pass, 0 fail
+# 6 pass, 0 fail
 ```
 
 The standalone `Atlas AgentFlow Adapter Boundary` pull-request workflow runs

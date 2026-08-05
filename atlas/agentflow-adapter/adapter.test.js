@@ -9,8 +9,7 @@ const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_AD
 
 const adapterSource = fs.readFileSync(path.join(__dirname, 'adapter.js'), 'utf8')
 
-const prohibitedRuntimeAccess =
-    /\b(?:require|import)\b|\bfetch\s*\(|\bprocess\s*(?:\.\s*env\b|\[\s*['"]env['"]\s*\])|\b(?:fs|http|https|net|tls|child_process)\s*\./
+const prohibitedRuntimeAccess = /\b(?:require|import|process|globalThis)\b|\bfetch\s*\(|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function inaccessibleRequest() {
     return new Proxy(
@@ -34,6 +33,13 @@ test('no-I/O boundary check rejects static imports', () => {
 
 test('no-I/O boundary check rejects computed environment access', () => {
     assert.match("process['env'].ATLAS_TOKEN", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects global runtime capabilities', () => {
+    assert.match("globalThis.fetch('https://example.invalid')", prohibitedRuntimeAccess)
+    assert.match('globalThis.process.env.ATLAS_TOKEN', prohibitedRuntimeAccess)
+    assert.match('const { env } = process', prohibitedRuntimeAccess)
+    assert.match("require('node:dns').lookup('example.invalid')", prohibitedRuntimeAccess)
 })
 
 test('non-production adapter rejects run requests without inspecting caller data', async () => {
