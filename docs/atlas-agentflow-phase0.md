@@ -48,14 +48,19 @@ Isolated pinned Flowise 2.2.7 runtime
 1. Flowise is never directly exposed to Atlas clients.
 2. Atlas identity, authentication, authorization, permissions, tenants,
    projects, assignments, reviews, governance, and event-outbox data do not
-   enter Flowise's database through this work.
+   enter Flowise's database.
 3. Atlas owns the external run lifecycle and audit record; Flowise is an
    isolated runtime dependency only.
 4. A Flowise execution identifier is an opaque runtime reference, not an Atlas
    actor, project, permission, or authorization claim.
-5. The disabled local skeleton has no execution, I/O, configuration, or secret
-   loading behavior. Its source-level static tripwire is a regression guard, not
-   a complete proof against indirect JavaScript runtime capabilities.
+5. Flowise responses, tool results, streamed chunks, artifact references, and
+   errors are untrusted input at the Atlas boundary. They must be validated and
+   bounded by Atlas and cannot become trusted markup, domain records, or
+   authorization decisions.
+6. The disabled local skeleton has no execution, I/O, configuration, or secret
+   loading behavior. Its source-level static tripwire and closed directory
+   allow-list are regression guards, not a complete proof against indirect
+   JavaScript runtime capabilities.
 
 ## Phase-0 adapter contract
 
@@ -89,32 +94,38 @@ Do **not** implement a transport until Atlas approves all of the following:
    handle the complete Flowise prefix allow-list before any transport exists.
 4. Run lifecycle semantics, especially cancellation and human-in-the-loop
    continuation, plus durable Atlas audit/event ownership.
-5. The permitted Flowise node/tool catalog, sandboxing, outbound-egress and
-   SSRF controls, filesystem policy, and MCP connectivity. No custom code,
-   filesystem, HTTP, code-interpreter, or MCP capability may be enabled by
-   implication of the transport.
-6. Ownership, provisioning, rotation, storage, and recovery of Flowise runtime
+5. The permitted Flowise node/tool catalog, sandboxing, default-deny egress and
+   SSRF controls, filesystem policy, and MCP connectivity. Egress must not
+   reach Atlas services, Atlas datastores, queue stores, or instance-metadata
+   endpoints. No custom code, filesystem, HTTP, code-interpreter, or MCP
+   capability may be enabled by implication of the transport.
+6. The trust model for model-directed tool invocation: which capabilities may be
+   selected from model output versus only Atlas-supplied configuration, which
+   content is untrusted, and which per-run capability scopes or human approvals
+   bound prompt-injection impact. The design must assume injection succeeds and
+   limit capability blast radius rather than relying on prompts.
+7. Ownership, provisioning, rotation, storage, and recovery of Flowise runtime
    credentials and encryption material, including `FLOWISE_SECRETKEY_OVERWRITE`,
    `SECRETKEY_PATH`, and Flowise's credential store. Phase 0 does not authorize
    putting Atlas or third-party production secrets in Flowise.
-7. Data classification, redaction, retention, and approved handling of inputs,
+8. Data classification, redaction, retention, and approved handling of inputs,
    outputs, uploads, traces, telemetry, and logs, including Flowise's
    default-on telemetry posture and its `DISABLE_FLOWISE_TELEMETRY` control.
-8. A version-specific, allow-listed input contract that rejects Flowise
+9. A version-specific, allow-listed input contract that rejects Flowise
    `overrideConfig`, node-input, variable, credential-reference, and upload
    overrides unless Atlas explicitly authorizes each capability.
-9. Ownership and cadence or advisory triggers for security review of the frozen
+10. Ownership and cadence or advisory triggers for security review of the frozen
    Flowise `2.2.7` release and its dependencies, without permitting automatic
    upstream synchronization.
-10. Whether a shared Flowise instance is permitted or whether an instance must
+11. Whether a shared Flowise instance is permitted or whether an instance must
     be isolated per tenant or trust domain. The decision must account for
     Flowise-internal chatflow definitions, credential store, uploads, chat
     messages, and tool reachability; Atlas-layer authorization alone does not
     partition that state.
-11. Resource exhaustion and cost controls owned by Atlas and private ingress:
+12. Resource exhaustion and cost controls owned by Atlas and private ingress:
     concurrency, execution timeouts, rate limits, payload and upload limits,
     and model-spend bounds.
-12. Whether queue mode is enabled. If it is, Redis or any equivalent queue/data
+13. Whether queue mode is enabled. If it is, Redis or any equivalent queue/data
     store is an additional contained data path subject to the same retention,
     redaction, access-control, and operational-ownership decisions.
 
@@ -134,7 +145,7 @@ initial test failed because `./adapter` did not exist; after the minimal
 fail-closed implementation, the contract test passed:
 
 ```text
-node --test atlas/agentflow-adapter/adapter.test.js
+node --test atlas/agentflow-adapter/*.test.js
 # all adapter contract tests pass
 ```
 

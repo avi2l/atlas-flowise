@@ -14,11 +14,7 @@ function collectAdapterSources(directory, rootDirectory = directory) {
 
         if (entry.isDirectory()) {
             sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory))
-        } else if (
-            entry.isFile() &&
-            /\.(?:js|cjs|mjs|jsx|ts|tsx|json)$/.test(entry.name) &&
-            !/\.test\.(?:js|cjs|mjs|jsx|ts|tsx)$/.test(entry.name)
-        ) {
+        } else if (entry.isFile()) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
                 source: fs.readFileSync(entryPath, 'utf8')
@@ -29,7 +25,8 @@ function collectAdapterSources(directory, rootDirectory = directory) {
     return sourceFiles
 }
 
-const adapterSources = collectAdapterSources(__dirname)
+const adapterDirectoryEntries = collectAdapterSources(__dirname)
+const adapterSources = adapterDirectoryEntries.filter(({ name }) => name === 'adapter.js')
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
 
@@ -40,8 +37,8 @@ const prohibitedRuntimeAccess =
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(
-        adapterSources.map(({ name }) => name),
-        ['adapter.js']
+        adapterDirectoryEntries.map(({ name }) => name).sort(),
+        ['README.md', 'adapter.js', 'adapter.test.js']
     )
 
     for (const { source } of adapterSources) {
@@ -150,6 +147,25 @@ test('adapter source collector covers nested JavaScript module variants', () => 
     }
 })
 
+test('adapter directory collector includes every file type so a closed boundary can reject credentials', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        fs.writeFileSync(path.join(fixtureDirectory, 'adapter.js'), "'use strict'\n")
+        fs.writeFileSync(path.join(fixtureDirectory, '.env'), 'ATLAS_TOKEN=must-not-be-present\n')
+        fs.writeFileSync(path.join(fixtureDirectory, 'runtime.sh'), '#!/bin/sh\n')
+
+        assert.deepEqual(
+            collectAdapterSources(fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['.env', 'adapter.js', 'runtime.sh']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
 test('no-I/O boundary check rejects static imports', () => {
     assert.match("import { readFile } from 'node:fs'", prohibitedRuntimeAccess)
 })
@@ -194,6 +210,7 @@ test('adapter boundary workflow runs for every pull request and push', () => {
     assert.match(adapterWorkflowSource, /^\s{4}push:\s*$/m)
     assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
     assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
+    assert.match(adapterWorkflowSource, /node --test atlas\/agentflow-adapter\/\*\.test\.js/)
 })
 
 test('Phase 0 documentation accurately describes the adapter workflow trigger scope', () => {
