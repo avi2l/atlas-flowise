@@ -2,15 +2,7 @@ name: Atlas AgentFlow Adapter Boundary
 
 on:
     pull_request:
-        paths:
-            - 'atlas/agentflow-adapter/**'
-            - '.github/workflows/atlas-agentflow-adapter.yml'
-            - '.dockerignore'
     push:
-        paths:
-            - 'atlas/agentflow-adapter/**'
-            - '.github/workflows/atlas-agentflow-adapter.yml'
-            - '.dockerignore'
 
 permissions:
     contents: read
