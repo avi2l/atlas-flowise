@@ -90,8 +90,10 @@ Do **not** implement a transport until Atlas approves all of the following:
 
 These are architecture decisions with security impact. Their absence is why
 this Phase-0 adapter stays disabled. The inherited repository-dispatch
-workflows are also deferred for a separate GitHub Actions security review; this
-work neither runs nor configures them.
+workflows are also deferred for a separate GitHub Actions security review; they
+can be triggered by merging work to `main`, so this branch must not be merged
+to `main` until that decision is recorded. This work neither runs nor
+configures them.
 
 ## Verification
 

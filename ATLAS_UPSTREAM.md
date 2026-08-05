@@ -31,11 +31,12 @@ than following upstream `main` automatically.
 
 The pinned upstream tree includes `autoSyncSingleCommit.yml` and
 `autoSyncMergedPullRequest.yml`. They were inherited unchanged and were not
-run, configured, or relied upon by the Atlas Phase-0 work. Before any use of
-the fork's GitHub Actions on an Atlas-owned branch, review their external
-repository-dispatch behavior, secrets, privileges, and `pull_request_target`
-trigger as a separate security decision. This policy does not authorize an
-automatic upstream synchronization.
+run, configured, or relied upon by the Atlas Phase-0 work. They are not
+opt-in: a push to `main` and a pull-request close against `main` can trigger
+them. Do not merge Atlas work to `main` until a separate security decision has
+reviewed their external repository-dispatch behavior, secrets, privileges,
+`pull_request_target` trigger, and untrusted pull-request metadata handling.
+This policy does not authorize an automatic upstream synchronization.
 
 ## Initial scope
 
