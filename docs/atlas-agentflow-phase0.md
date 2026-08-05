@@ -109,7 +109,7 @@ fail-closed implementation, the contract test passed:
 
 ```text
 node --test atlas/agentflow-adapter/adapter.test.js
-# 3 pass, 0 fail
+# 4 pass, 0 fail
 ```
 
 The standalone `Atlas AgentFlow Adapter Boundary` pull-request workflow runs

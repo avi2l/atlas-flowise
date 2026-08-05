@@ -9,7 +9,7 @@ const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_AD
 
 const adapterSource = fs.readFileSync(path.join(__dirname, 'adapter.js'), 'utf8')
 
-const prohibitedRuntimeAccess = /\b(?:require|import|fetch)\s*\(|\bprocess\s*\.\s*env\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
+const prohibitedRuntimeAccess = /\b(?:require|import)\b|\bfetch\s*\(|\bprocess\s*\.\s*env\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function inaccessibleRequest() {
     return new Proxy(
@@ -25,6 +25,10 @@ function inaccessibleRequest() {
 test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
     assert.deepEqual(NON_PRODUCTION_ADAPTER_DEPENDENCIES, [])
     assert.doesNotMatch(adapterSource, prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects static imports', () => {
+    assert.match("import { readFile } from 'node:fs'", prohibitedRuntimeAccess)
 })
 
 test('non-production adapter rejects run requests without inspecting caller data', async () => {
