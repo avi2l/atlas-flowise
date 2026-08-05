@@ -10,7 +10,8 @@ const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_AD
 const adapterSource = fs.readFileSync(path.join(__dirname, 'adapter.js'), 'utf8')
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 
-const prohibitedRuntimeAccess = /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\s*\(|\b(?:fs|http|https|net|tls|child_process)\s*\./
+const prohibitedRuntimeAccess =
+    /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\s*\(|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function inaccessibleRequest() {
     return new Proxy(
