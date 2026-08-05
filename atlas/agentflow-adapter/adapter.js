@@ -1,6 +1,7 @@
 'use strict'
 
 const DISABLED_CODE = 'ATLAS_AGENTFLOW_ADAPTER_DISABLED'
+const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object.freeze([])
 
 class NonProductionAdapterError extends Error {
     constructor(operation) {
@@ -25,5 +26,6 @@ function createNonProductionAdapter() {
 
 module.exports = {
     createNonProductionAdapter,
-    NonProductionAdapterError
+    NonProductionAdapterError,
+    NON_PRODUCTION_ADAPTER_DEPENDENCIES
 }

@@ -1,9 +1,15 @@
 'use strict'
 
+const fs = require('node:fs')
+const path = require('node:path')
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { createNonProductionAdapter, NonProductionAdapterError } = require('./adapter')
+const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_ADAPTER_DEPENDENCIES } = require('./adapter')
+
+const adapterSource = fs.readFileSync(path.join(__dirname, 'adapter.js'), 'utf8')
+
+const prohibitedRuntimeAccess = /\b(?:require|import|fetch)\s*\(|\bprocess\s*\.\s*env\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function inaccessibleRequest() {
     return new Proxy(
@@ -15,6 +21,11 @@ function inaccessibleRequest() {
         }
     )
 }
+
+test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
+    assert.deepEqual(NON_PRODUCTION_ADAPTER_DEPENDENCIES, [])
+    assert.doesNotMatch(adapterSource, prohibitedRuntimeAccess)
+})
 
 test('non-production adapter rejects run requests without inspecting caller data', async () => {
     const adapter = createNonProductionAdapter()
