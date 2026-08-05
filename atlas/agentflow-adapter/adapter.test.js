@@ -11,13 +11,25 @@ const adapterSource = fs.readFileSync(path.join(__dirname, 'adapter.js'), 'utf8'
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\s*\(|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function inaccessibleRequest() {
     return new Proxy(
         {},
         {
             get() {
+                throw new Error('The disabled adapter must not inspect request data.')
+            },
+            has() {
+                throw new Error('The disabled adapter must not inspect request data.')
+            },
+            ownKeys() {
+                throw new Error('The disabled adapter must not inspect request data.')
+            },
+            getOwnPropertyDescriptor() {
+                throw new Error('The disabled adapter must not inspect request data.')
+            },
+            getPrototypeOf() {
                 throw new Error('The disabled adapter must not inspect request data.')
             }
         }
@@ -35,6 +47,24 @@ test('no-I/O boundary check rejects static imports', () => {
 
 test('no-I/O boundary check rejects computed environment access', () => {
     assert.match("process['env'].ATLAS_TOKEN", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects an aliased global fetch capability', () => {
+    assert.match("const send = fetch; send('https://example.invalid')", prohibitedRuntimeAccess)
+})
+
+test('inaccessible request rejects reflective inspection', () => {
+    const request = inaccessibleRequest()
+
+    for (const inspect of [
+        () => Object.keys(request),
+        () => Reflect.ownKeys(request),
+        () => 'credential' in request,
+        () => Object.getPrototypeOf(request),
+        () => Object.getOwnPropertyDescriptor(request, 'credential')
+    ]) {
+        assert.throws(inspect, /must not inspect request data/)
+    }
 })
 
 test('no-I/O boundary check rejects global runtime capabilities', () => {
