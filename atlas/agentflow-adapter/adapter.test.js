@@ -38,6 +38,21 @@ const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerig
 const prohibitedRuntimeAccess =
     /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
+function assertAdapterSourcesAreSafe() {
+    assert.deepEqual(
+        adapterSources.map(({ name }) => name),
+        ['adapter.js']
+    )
+
+    for (const { source } of adapterSources) {
+        assert.doesNotMatch(source, prohibitedRuntimeAccess)
+    }
+
+    assert.match(adapterSources[0].source, /const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object\.freeze\(\[\]\)/)
+}
+
+assertAdapterSourcesAreSafe()
+
 function loadVerifiedAdapter() {
     return require('./adapter')
 }
@@ -69,17 +84,14 @@ test('adapter source is verified before the test process loads it', () => {
     assert.equal(require.cache[require.resolve('./adapter')], undefined)
 })
 
+test('adapter source validation is installed before any test can load the adapter', () => {
+    const testSource = fs.readFileSync(__filename, 'utf8')
+
+    assert.ok(testSource.indexOf('assertAdapterSourcesAreSafe()') < testSource.indexOf("test('adapter source is verified"))
+})
+
 test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
-    assert.deepEqual(
-        adapterSources.map(({ name }) => name),
-        ['adapter.js']
-    )
-
-    for (const { source } of adapterSources) {
-        assert.doesNotMatch(source, prohibitedRuntimeAccess)
-    }
-
-    assert.match(adapterSources[0].source, /const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object\.freeze\(\[\]\)/)
+    assertAdapterSourcesAreSafe()
 })
 
 test('adapter source collector covers nested JavaScript module variants', () => {
