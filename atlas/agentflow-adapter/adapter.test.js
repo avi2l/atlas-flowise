@@ -1,17 +1,35 @@
 'use strict'
 
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_ADAPTER_DEPENDENCIES } = require('./adapter')
 
-const adapterSources = fs
-    .readdirSync(__dirname, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.js') && !entry.name.endsWith('.test.js'))
-    .map((entry) => ({ name: entry.name, source: fs.readFileSync(path.join(__dirname, entry.name), 'utf8') }))
+function collectAdapterSources(directory, rootDirectory = directory) {
+    const sourceFiles = []
+
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const entryPath = path.join(directory, entry.name)
+
+        if (entry.isDirectory()) {
+            sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory))
+        } else if (entry.isFile() && /\.(?:js|cjs|mjs|ts)$/.test(entry.name) && !/\.test\.(?:js|cjs|mjs|ts)$/.test(entry.name)) {
+            sourceFiles.push({
+                name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
+                source: fs.readFileSync(entryPath, 'utf8')
+            })
+        }
+    }
+
+    return sourceFiles
+}
+
+const adapterSources = collectAdapterSources(__dirname)
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
+const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 
@@ -50,6 +68,24 @@ test('non-production adapter has an explicit dependency-free, no-I/O boundary', 
 
     for (const { source } of adapterSources) {
         assert.doesNotMatch(source, prohibitedRuntimeAccess)
+    }
+})
+
+test('adapter source collector covers nested JavaScript module variants', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        fs.mkdirSync(path.join(fixtureDirectory, 'nested'))
+        for (const relativePath of ['adapter.js', 'nested/helper.cjs', 'nested/helper.mjs', 'nested/helper.ts']) {
+            fs.writeFileSync(path.join(fixtureDirectory, relativePath), "'use strict'\n")
+        }
+
+        assert.deepEqual(
+            collectAdapterSources(fixtureDirectory).map(({ name }) => name).sort(),
+            ['adapter.js', 'nested/helper.cjs', 'nested/helper.mjs', 'nested/helper.ts']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
     }
 })
 
@@ -97,6 +133,10 @@ test('adapter boundary workflow runs for every pull request and push', () => {
     assert.match(adapterWorkflowSource, /^\s{4}push:\s*$/m)
     assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
     assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
+})
+
+test('Phase 0 documentation accurately describes the adapter workflow trigger scope', () => {
+    assert.doesNotMatch(phaseZeroDocumentationSource, /scoped pushes/)
 })
 
 test('root container build context excludes the non-production adapter', () => {

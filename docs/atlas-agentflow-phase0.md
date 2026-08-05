@@ -128,7 +128,7 @@ node --test atlas/agentflow-adapter/adapter.test.js
 ```
 
 The standalone `Atlas AgentFlow Adapter Boundary` workflow runs this contract on
-both pull requests and scoped pushes with Node 20, without installing or
+both pull requests and all pushes with Node 20, without installing or
 starting Flowise. The contract also protects the root container-build exclusion
 for `atlas/`; it does not validate the separate inherited `docker/Dockerfile`,
 which does not copy the repository context. The inherited
