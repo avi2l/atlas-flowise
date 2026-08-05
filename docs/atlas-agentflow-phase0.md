@@ -61,13 +61,14 @@ glob this directory, so the adapter follows repository formatting conventions.
 Its only behavior is fail-closed:
 
 -   `enabled` is always `false`.
--   `run({ flowRef, runRef, input })` rejects.
--   `abort({ flowRef, runRef })` rejects.
+-   `run()` rejects without inspecting caller arguments.
+-   `abort()` rejects without inspecting caller arguments.
 -   The rejected error has code `ATLAS_AGENTFLOW_ADAPTER_DISABLED`.
+-   The rejected error identifies only the attempted operation (`run` or
+    `abort`); it carries no request data.
 
-The provided reference names are deliberately opaque. This establishes a
-minimal future seam without defining an Atlas credential, actor, permission,
-or transport protocol.
+No request shape is accepted. This establishes a minimal future seam without
+defining an Atlas credential, actor, permission, data, or transport protocol.
 
 ## Security-sensitive decisions deferred (stop gates)
 

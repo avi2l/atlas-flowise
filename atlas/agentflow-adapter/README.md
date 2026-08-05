@@ -8,14 +8,14 @@ wired into, or reachable from Flowise.
 
 `createNonProductionAdapter()` always returns an adapter with `enabled: false`.
 Both `run()` and `abort()` always reject with
-`ATLAS_AGENTFLOW_ADAPTER_DISABLED`. They do not make network calls, read
+`ATLAS_AGENTFLOW_ADAPTER_DISABLED` and report only the attempted operation.
+They do not inspect caller arguments, make network calls, read
 configuration or environment variables, accept credentials, persist data, or
 call Flowise.
 
-The request shapes used by the test carry only opaque `flowRef` and `runRef`
-values plus caller-owned metadata. They intentionally do not model Atlas
-users, actors, permissions, projects, assignments, credentials, or production
-records.
+No request contract exists in Phase 0. The adapter deliberately does not model
+Atlas users, actors, permissions, projects, assignments, credentials, inputs,
+or production records.
 
 ## Explicit non-goals
 
