@@ -36,10 +36,7 @@ const prohibitedRuntimeAccess =
     /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
-    assert.deepEqual(
-        adapterDirectoryEntries.map(({ name }) => name).sort(),
-        ['README.md', 'adapter.js', 'adapter.test.js']
-    )
+    assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
 
     for (const { source } of adapterSources) {
         assert.doesNotMatch(source, prohibitedRuntimeAccess)
