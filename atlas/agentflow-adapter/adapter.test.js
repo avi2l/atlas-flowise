@@ -6,14 +6,24 @@ const path = require('node:path')
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-function collectAdapterSources(directory, rootDirectory = directory) {
+function assertSupportedDirectoryEntry(entry, entryPath) {
+    if (!entry.isDirectory() && !entry.isFile()) {
+        assert.fail(`Unsupported adapter boundary entry: ${entryPath}`)
+    }
+}
+
+function collectAdapterSources(directory, rootDirectory = directory, rejectUnsupportedEntries = false) {
     const sourceFiles = []
 
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         const entryPath = path.join(directory, entry.name)
 
+        if (rejectUnsupportedEntries) {
+            assertSupportedDirectoryEntry(entry, entryPath)
+        }
+
         if (entry.isDirectory()) {
-            sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory))
+            sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory, rejectUnsupportedEntries))
         } else if (entry.isFile()) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
@@ -25,12 +35,13 @@ function collectAdapterSources(directory, rootDirectory = directory) {
     return sourceFiles
 }
 
-const adapterDirectoryEntries = collectAdapterSources(__dirname)
+const adapterDirectoryEntries = collectAdapterSources(__dirname, __dirname, true)
 const adapterSources = adapterDirectoryEntries.filter(({ name }) => name === 'adapter.js')
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
+const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.join(__dirname, '../../docker')]
 
 const prohibitedRuntimeAccess =
     /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
@@ -43,6 +54,14 @@ function assertAdapterSourcesAreSafe() {
     }
 
     assert.match(adapterSources[0].source, /const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object\.freeze\(\[\]\)/)
+}
+
+function assertFlowiseRuntimeDoesNotReferenceAdapter() {
+    const runtimeSources = flowiseRuntimeDirectories.flatMap((directory) => collectAdapterSources(directory))
+
+    for (const { name, source } of runtimeSources) {
+        assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter/, name)
+    }
 }
 
 function assertValidationInvocationRunsBeforeAdapterLoads(source) {
@@ -163,6 +182,15 @@ test('adapter directory collector includes every file type so a closed boundary 
     }
 })
 
+test('adapter directory collector rejects unsupported entries such as symbolic links', () => {
+    const unsupportedEntry = {
+        isDirectory: () => false,
+        isFile: () => false
+    }
+
+    assert.throws(() => assertSupportedDirectoryEntry(unsupportedEntry, 'credential-link'), /Unsupported adapter boundary entry/)
+})
+
 test('no-I/O boundary check rejects static imports', () => {
     assert.match("import { readFile } from 'node:fs'", prohibitedRuntimeAccess)
 })
@@ -227,6 +255,10 @@ test('Phase 0 documentation defers tenancy, resource, and queue containment deci
 test('root container build context excludes the non-production adapter', () => {
     assert.match(dockerIgnoreSource, /^atlas\/$/m)
     assert.doesNotMatch(dockerIgnoreSource, /^!atlas(?:\/|$)/m)
+})
+
+test('Flowise runtime sources do not import, require, or reference the non-production adapter', () => {
+    assertFlowiseRuntimeDoesNotReferenceAdapter()
 })
 
 test('non-production adapter rejects construction and run arguments without inspecting caller data', async () => {
