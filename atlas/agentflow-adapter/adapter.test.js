@@ -90,8 +90,8 @@ test('adapter boundary workflow has explicit pull-request and push containment p
         assert.equal(adapterWorkflowSource.split(protectedPath).length - 1, 2)
     }
 
-    assert.match(adapterWorkflowSource, /pull_request:\n        paths:/)
-    assert.match(adapterWorkflowSource, /push:\n        paths:/)
+    assert.match(adapterWorkflowSource, /pull_request:\n\s{8}paths:/)
+    assert.match(adapterWorkflowSource, /push:\n\s{8}paths:/)
     assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
     assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
 })
