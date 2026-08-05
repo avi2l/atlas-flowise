@@ -141,6 +141,10 @@ test('Phase 0 documentation accurately describes the adapter workflow trigger sc
     assert.doesNotMatch(phaseZeroDocumentationSource, /scoped pushes/)
 })
 
+test('Phase 0 documentation does not preserve a stale contract-test count', () => {
+    assert.doesNotMatch(phaseZeroDocumentationSource, /# \d+ pass, \d+ fail/)
+})
+
 test('root container build context excludes the non-production adapter', () => {
     assert.match(dockerIgnoreSource, /^atlas\/$/m)
     assert.doesNotMatch(dockerIgnoreSource, /^!atlas(?:\/|$)/m)

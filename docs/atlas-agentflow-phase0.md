@@ -124,7 +124,7 @@ fail-closed implementation, the contract test passed:
 
 ```text
 node --test atlas/agentflow-adapter/adapter.test.js
-# 11 pass, 0 fail
+# all adapter contract tests pass
 ```
 
 The standalone `Atlas AgentFlow Adapter Boundary` workflow runs this contract on
