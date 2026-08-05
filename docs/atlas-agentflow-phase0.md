@@ -15,6 +15,7 @@ Atlas to Flowise.
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AgentFlow model            | `packages/server/src/utils/buildChatflow.ts` uses `MULTIAGENT` for one AgentFlow classification path, while execution can also select `buildAgentGraph.ts` from ending-node categories.                | Atlas must treat the pinned runtime as an isolated workflow/canvas engine, not as the system of record. A future allow-list or routing rule cannot rely on the chatflow type alone.                                                            |
 | AgentFlow discovery and UI | `packages/server/src/services/chatflows/index.ts` and `packages/ui/src/api/chatflows.js` query `MULTIAGENT`; Flowise exposes its own `/agentflows` UI in `packages/ui/src/views/agentflows/index.jsx`. | The Flowise UI has no Atlas context. Do not embed or expose it as an Atlas endpoint in Phase 0.                                                                                                                                                |
+| Runtime authentication     | `packages/server/src/index.ts` enables one global Basic Auth user only when both `FLOWISE_USERNAME` and `FLOWISE_PASSWORD` are configured. `WHITELIST_URLS` exempts prediction, vector upsert, attachment, upload-file, and metrics paths from that middleware. | Flowise does not provide Atlas actor, tenant, project, or authorization enforcement. The contained deployment boundary and Atlas-owned authorization layer are mandatory; Flowise must never be directly exposed to Atlas clients. |
 | Execution data             | `buildChatflow.ts` creates/stores chat messages and sends AgentFlow telemetry. Flowise telemetry is enabled unless `DISABLE_FLOWISE_TELEMETRY=true`.                                                   | Atlas project, actor, assignment, review, governance, and event-outbox records must remain outside Flowise, as required by `ATLAS_UPSTREAM.md`. No runtime is started in Phase 0; telemetry handling is an explicit future data-handling gate. |
 | Example content            | `packages/server/marketplaces/agentflows/` contains example flow JSON.                                                                                                                                 | Examples are reconnaissance material only; no marketplace flow or production data is imported into the adapter.                                                                                                                                |
 | License/pin                | `ATLAS_UPSTREAM.md` records Apache 2.0 for this exact release and forbids automatic upstream sync.                                                                                                     | Any future upstream change requires the recorded per-change license/security/API review; no later enterprise/commercial code may be copied.                                                                                                    |
@@ -105,6 +106,11 @@ fail-closed implementation, the contract test passed:
 node --test atlas/agentflow-adapter/adapter.test.js
 # 2 pass, 0 fail
 ```
+
+The root `test:atlas-agentflow-adapter` script runs this contract in the
+standard pull-request CI workflow before lint and build. The `atlas/`
+directory is also excluded from Flowise container build contexts, preserving
+the skeleton's separation from Flowise runtime images.
 
 The repository-wide Flowise build was not treated as a release signal in this
 Phase-0 change: the local environment has Node `24.14.0`, while the pinned
