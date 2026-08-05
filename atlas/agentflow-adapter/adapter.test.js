@@ -10,6 +10,8 @@ const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_AD
 const adapterSource = fs.readFileSync(path.join(__dirname, 'adapter.js'), 'utf8')
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 
+const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
+
 const prohibitedRuntimeAccess =
     /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
@@ -94,6 +96,10 @@ test('adapter boundary workflow has explicit pull-request and push containment p
     assert.match(adapterWorkflowSource, /push:\n\s{8}paths:/)
     assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
     assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
+})
+
+test('root container build context excludes the non-production adapter', () => {
+    assert.match(dockerIgnoreSource, /^atlas\/$/m)
 })
 
 test('non-production adapter rejects run requests without inspecting caller data', async () => {

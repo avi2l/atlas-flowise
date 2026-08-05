@@ -11,9 +11,10 @@ Both `run()` and `abort()` always reject with
 `ATLAS_AGENTFLOW_ADAPTER_DISABLED` and report only the attempted operation.
 They do not inspect caller arguments, make network calls, read
 configuration or environment variables, accept credentials, persist data, or
-call Flowise. Its declared dependency list is intentionally empty; the contract test
-also rejects imports and common filesystem, network, process-environment, and
-child-process access in the adapter source.
+call Flowise. Its declared dependency list is intentionally empty. The contract
+test includes a deliberately limited static tripwire for imports and common
+filesystem, network, process-environment, and child-process access; it is not a
+complete proof against every indirect JavaScript runtime capability.
 
 No request contract exists in Phase 0. The adapter deliberately does not model
 Atlas users, actors, permissions, projects, assignments, credentials, inputs,
