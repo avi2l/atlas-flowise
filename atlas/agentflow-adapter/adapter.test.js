@@ -81,7 +81,9 @@ test('adapter source collector covers nested JavaScript module variants', () => 
         }
 
         assert.deepEqual(
-            collectAdapterSources(fixtureDirectory).map(({ name }) => name).sort(),
+            collectAdapterSources(fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
             ['adapter.js', 'nested/helper.cjs', 'nested/helper.mjs', 'nested/helper.ts']
         )
     } finally {
