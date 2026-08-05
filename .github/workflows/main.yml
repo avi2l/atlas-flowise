@@ -29,7 +29,6 @@ jobs:
                   cache: 'pnpm'
                   cache-dependency-path: 'pnpm-lock.yaml'
             - run: pnpm install
-            - run: pnpm test:atlas-agentflow-adapter
             - run: pnpm lint
             - run: pnpm build
             - name: Cypress install

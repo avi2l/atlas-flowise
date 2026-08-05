@@ -32,11 +32,20 @@ than following upstream `main` automatically.
 The pinned upstream tree includes `autoSyncSingleCommit.yml` and
 `autoSyncMergedPullRequest.yml`. They were inherited unchanged and were not
 run, configured, or relied upon by the Atlas Phase-0 work. They are not
-opt-in: a push to `main` and a pull-request close against `main` can trigger
+opt-in: a push to `main` and a merged pull request against `main` can trigger
 them. Do not merge Atlas work to `main` until a separate security decision has
 reviewed their external repository-dispatch behavior, secrets, privileges,
 `pull_request_target` trigger, and untrusted pull-request metadata handling.
 This policy does not authorize an automatic upstream synchronization.
+
+## Frozen-version security review gate
+
+The pinned release is a compatibility and license control, not a security
+maintenance plan. Before any production use, Atlas must assign an owner and a
+review cadence or advisory trigger for Flowise `2.2.7` and its dependencies.
+Each candidate remediation remains subject to the per-change security, license,
+API compatibility, and product-fit review in this policy; this does not
+authorize an upstream sync or upgrade.
 
 ## Initial scope
 
