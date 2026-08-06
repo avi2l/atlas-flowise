@@ -127,9 +127,10 @@ function assertFlowiseBuildGraphDoesNotReferenceAdapter(
 }
 
 function assertValidationInvocationRunsBeforeAdapterLoads(source) {
-    const normalizedSource = source.replace(/\r\n/g, '\n')
+    const normalizedSource = source.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))
     const validationMatch = normalizedSource.match(/^assertAdapterSourcesAreSafe\(\)\n\nfunction loadVerifiedAdapter/m)
-    const adapterLoadOffset = normalizedSource.lastIndexOf("return require('./adapter')")
+    const adapterLoadMarker = ['return require', "('./adapter')"].join('')
+    const adapterLoadOffset = normalizedSource.indexOf(adapterLoadMarker)
 
     assert.notEqual(validationMatch, null)
     assert.notEqual(adapterLoadOffset, -1)
@@ -137,17 +138,33 @@ function assertValidationInvocationRunsBeforeAdapterLoads(source) {
 }
 
 test('validation placement check rejects a decoy validation marker after the adapter load', () => {
+    const adapterLoad = ["return require('./", "adapter')"].join('')
     const source = [
         'const marker = `assertAdapterSourcesAreSafe()\n\nfunction loadVerifiedAdapter`',
-        "function loadVerifiedAdapter() { return require('./adapter') }",
+        `function loadVerifiedAdapter() { ${adapterLoad} }`,
         'assertAdapterSourcesAreSafe()'
     ].join('\n')
 
     assert.throws(() => assertValidationInvocationRunsBeforeAdapterLoads(source))
 })
 
+test('validation placement check rejects an earlier adapter load before the validated loader', () => {
+    const adapterLoad = ["return require('./", "adapter')"].join('')
+    const source = [
+        `function preload() { ${adapterLoad} }`,
+        'assertAdapterSourcesAreSafe()',
+        '',
+        `function loadVerifiedAdapter() { ${adapterLoad} }`
+    ].join('\n')
+
+    assert.throws(() => assertValidationInvocationRunsBeforeAdapterLoads(source))
+})
+
 test('validation placement check accepts a CRLF-encoded source when validation precedes loading', () => {
-    const source = "assertAdapterSourcesAreSafe()\r\n\r\nfunction loadVerifiedAdapter() { return require('./adapter') }"
+    const adapterLoad = ["return require('./", "adapter')"].join('')
+    const source = ['assertAdapterSourcesAreSafe()', `function loadVerifiedAdapter() { ${adapterLoad} }`].join(
+        String.fromCharCode(13, 10) + String.fromCharCode(13, 10)
+    )
 
     assert.doesNotThrow(() => assertValidationInvocationRunsBeforeAdapterLoads(source))
 })
@@ -427,6 +444,11 @@ test('Phase 0 documentation accurately describes the adapter workflow trigger sc
 
 test('Phase 0 documentation does not preserve a stale contract-test count', () => {
     assert.doesNotMatch(phaseZeroDocumentationSource, /# \d+ pass, \d+ fail/)
+})
+
+test('Phase 0 documentation uses the same explicit adapter test command as CI', () => {
+    assert.match(phaseZeroDocumentationSource, /node --test atlas\/agentflow-adapter\/adapter\.test\.js/)
+    assert.doesNotMatch(phaseZeroDocumentationSource, /node --test atlas\/agentflow-adapter\/\*\.test\.js/)
 })
 
 test('Phase 0 documentation defers tenancy, erasure, resource, and queue containment decisions', () => {
