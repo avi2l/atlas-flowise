@@ -68,6 +68,7 @@ const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'u
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.join(__dirname, '../../docker')]
+const flowiseRuntimeFiles = [path.join(__dirname, '../../Dockerfile')]
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
@@ -95,7 +96,7 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
 
         if (entry.isDirectory() && !flowiseRuntimeIgnoredDirectories.includes(entry.name)) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
-        } else if (entry.isFile() && runtimeSourceExtensions.has(path.extname(entry.name))) {
+        } else if (entry.isFile() && (entry.name === 'Dockerfile' || runtimeSourceExtensions.has(path.extname(entry.name)))) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
                 source: fs.readFileSync(entryPath, 'utf8')
@@ -107,7 +108,14 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
 }
 
 function assertFlowiseRuntimeDoesNotReferenceAdapter() {
-    const runtimeSources = flowiseRuntimeDirectories.flatMap((directory) => collectRuntimeSources(directory, directory))
+    const runtimeSources = flowiseRuntimeDirectories
+        .flatMap((directory) => collectRuntimeSources(directory, directory))
+        .concat(
+            flowiseRuntimeFiles.map((filePath) => ({
+                name: path.basename(filePath),
+                source: fs.readFileSync(filePath, 'utf8')
+            }))
+        )
 
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter/, name)
@@ -254,6 +262,23 @@ test('runtime source collection reads only explicit source file types', () => {
                 .map(({ name }) => name)
                 .sort(),
             ['runtime.js']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes Dockerfiles for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        fs.writeFileSync(path.join(fixtureDirectory, 'Dockerfile'), 'COPY atlas/agentflow-adapter /boundary\n')
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['Dockerfile']
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
