@@ -49,7 +49,7 @@ const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|globalThis|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno)\b|\b(?:eval|Function|fetch)\b|\bmodule\.constructor\._load\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno)\b|\b(?:eval|Function|fetch)\b|\bmodule\.constructor\._load\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -287,6 +287,10 @@ test('no-I/O boundary check rejects static imports', () => {
     assert.match("import { readFile } from 'node:fs'", prohibitedRuntimeAccess)
 })
 
+test('no-I/O boundary check rejects console output', () => {
+    assert.match("console.log('must not emit adapter request data')", prohibitedRuntimeAccess)
+})
+
 test('no-I/O boundary check rejects computed environment access', () => {
     assert.match("process['env'].ATLAS_TOKEN", prohibitedRuntimeAccess)
 })
@@ -406,6 +410,9 @@ test('non-production adapter rejects construction and run arguments without insp
         assert.equal(error instanceof NonProductionAdapterError, true)
         assert.equal(error.code, 'ATLAS_AGENTFLOW_ADAPTER_DISABLED')
         assert.equal(error.operation, 'run')
+        assert.deepEqual(Object.keys(error).sort(), ['code', 'name', 'operation'])
+        assert.equal(Object.hasOwn(error, 'request'), false)
+        assert.equal(Object.hasOwn(error, 'cause'), false)
         return true
     })
 })
@@ -418,6 +425,9 @@ test('non-production adapter rejects construction and abort arguments without in
         assert.equal(error instanceof NonProductionAdapterError, true)
         assert.equal(error.code, 'ATLAS_AGENTFLOW_ADAPTER_DISABLED')
         assert.equal(error.operation, 'abort')
+        assert.deepEqual(Object.keys(error).sort(), ['code', 'name', 'operation'])
+        assert.equal(Object.hasOwn(error, 'request'), false)
+        assert.equal(Object.hasOwn(error, 'cause'), false)
         return true
     })
 })
