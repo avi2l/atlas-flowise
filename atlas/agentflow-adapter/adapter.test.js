@@ -6,6 +6,8 @@ const path = require('node:path')
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
+const adapterBoundaryFiles = ['README.md', 'adapter.js', 'adapter.test.js']
+
 function assertSupportedDirectoryEntry(entry, entryPath) {
     if (!entry.isDirectory() && !entry.isFile()) {
         assert.fail(`Unsupported adapter boundary entry: ${entryPath}`)
@@ -35,7 +37,25 @@ function collectAdapterSources(directory, rootDirectory = directory, rejectUnsup
     return sourceFiles
 }
 
-const adapterDirectoryEntries = collectAdapterSources(__dirname, __dirname, true)
+function readAdapterSourceFiles(directory) {
+    const entries = fs.readdirSync(directory, { withFileTypes: true })
+    const entryNames = entries.map(({ name }) => name).sort()
+
+    assert.deepEqual(entryNames, adapterBoundaryFiles, 'Unexpected adapter boundary entries')
+
+    return entries.map((entry) => {
+        assertSupportedDirectoryEntry(entry, path.join(directory, entry.name))
+        assert.ok(entry.isFile(), `Adapter boundary entry must be a file: ${entry.name}`)
+        const entryPath = path.join(directory, entry.name)
+
+        return {
+            name: entry.name,
+            source: fs.readFileSync(entryPath, 'utf8')
+        }
+    })
+}
+
+const adapterDirectoryEntries = readAdapterSourceFiles(__dirname)
 const adapterSources = adapterDirectoryEntries.filter(({ name }) => name === 'adapter.js')
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
@@ -283,6 +303,29 @@ test('adapter directory collector rejects unsupported entries such as symbolic l
     assert.throws(() => assertSupportedDirectoryEntry(unsupportedEntry, 'credential-link'), /Unsupported adapter boundary entry/)
 })
 
+test('adapter source loader rejects unexpected entries before reading their contents', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+    const originalReadFileSync = fs.readFileSync
+    const readPaths = []
+
+    try {
+        for (const file of adapterBoundaryFiles) {
+            fs.writeFileSync(path.join(fixtureDirectory, file), "'use strict'\n")
+        }
+        fs.writeFileSync(path.join(fixtureDirectory, '.env'), 'ATLAS_TOKEN=must-not-be-read\n')
+        fs.readFileSync = (filePath, ...arguments_) => {
+            readPaths.push(path.resolve(filePath))
+            return originalReadFileSync(filePath, ...arguments_)
+        }
+
+        assert.throws(() => readAdapterSourceFiles(fixtureDirectory), /Unexpected adapter boundary entries/)
+        assert.deepEqual(readPaths, [])
+    } finally {
+        fs.readFileSync = originalReadFileSync
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
 test('no-I/O boundary check rejects static imports', () => {
     assert.match("import { readFile } from 'node:fs'", prohibitedRuntimeAccess)
 })
@@ -347,6 +390,8 @@ test('adapter boundary workflow runs for every pull request and push', () => {
     assert.doesNotMatch(adapterWorkflowSource, /^\s+branches(?:-ignore)?:/m)
     assert.match(adapterWorkflowSource, /^\s{4}pull_request:\s*$/m)
     assert.match(adapterWorkflowSource, /^\s{4}push:\s*$/m)
+    assert.match(adapterWorkflowSource, /^permissions:\n\s{4}contents: read$/m)
+    assert.doesNotMatch(adapterWorkflowSource, /pull_request_target|secrets\./)
     assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
     assert.match(adapterWorkflowSource, /persist-credentials:\s*false/)
     assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
