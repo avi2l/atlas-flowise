@@ -49,7 +49,7 @@ const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\bmodule\.constructor\._load\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|globalThis|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno)\b|\b(?:eval|Function|fetch)\b|\bmodule\.constructor\._load\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -275,6 +275,15 @@ test('no-I/O boundary check rejects global runtime capabilities', () => {
     assert.match('globalThis.process.env.ATLAS_TOKEN', prohibitedRuntimeAccess)
     assert.match('const { env } = process', prohibitedRuntimeAccess)
     assert.match("require('node:dns').lookup('example.invalid')", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects browser and alternate-runtime network or environment capabilities', () => {
+    assert.match("new WebSocket('wss://example.invalid')", prohibitedRuntimeAccess)
+    assert.match("new EventSource('https://example.invalid')", prohibitedRuntimeAccess)
+    assert.match("new XMLHttpRequest('https://example.invalid')", prohibitedRuntimeAccess)
+    assert.match("navigator.sendBeacon('https://example.invalid')", prohibitedRuntimeAccess)
+    assert.match('Bun.env.ATLAS_TOKEN', prohibitedRuntimeAccess)
+    assert.match("Deno.env.get('ATLAS_TOKEN')", prohibitedRuntimeAccess)
 })
 
 test('no-I/O boundary check rejects dynamic code evaluation', () => {

@@ -128,6 +128,9 @@ Do **not** implement a transport until Atlas approves all of the following:
 13. Whether queue mode is enabled. If it is, Redis or any equivalent queue/data
     store is an additional contained data path subject to the same retention,
     redaction, access-control, and operational-ownership decisions.
+14. Operator access and flow-definition change control: who can access the
+    Flowise canvas or its administrative APIs, how workflow changes are approved
+    and audited, and how that control preserves tenant/trust-domain isolation.
 
 These are architecture decisions with security impact. Their absence is why
 this Phase-0 adapter stays disabled. The inherited repository-dispatch and
