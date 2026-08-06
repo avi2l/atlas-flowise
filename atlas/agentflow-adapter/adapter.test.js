@@ -61,10 +61,29 @@ function assertAdapterSourcesAreSafe() {
     assert.match(adapterSources[0].source, /const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object\.freeze\(\[\]\)/)
 }
 
+const runtimeSourceExtensions = new Set(['.cjs', '.js', '.json', '.jsx', '.mjs', '.sh', '.ts', '.tsx', '.yaml', '.yml'])
+
+function collectRuntimeSources(directory, rootDirectory = directory) {
+    const sourceFiles = []
+
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const entryPath = path.join(directory, entry.name)
+
+        if (entry.isDirectory() && !flowiseRuntimeIgnoredDirectories.includes(entry.name)) {
+            sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
+        } else if (entry.isFile() && runtimeSourceExtensions.has(path.extname(entry.name))) {
+            sourceFiles.push({
+                name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
+                source: fs.readFileSync(entryPath, 'utf8')
+            })
+        }
+    }
+
+    return sourceFiles
+}
+
 function assertFlowiseRuntimeDoesNotReferenceAdapter() {
-    const runtimeSources = flowiseRuntimeDirectories.flatMap((directory) =>
-        collectAdapterSources(directory, directory, false, flowiseRuntimeIgnoredDirectories)
-    )
+    const runtimeSources = flowiseRuntimeDirectories.flatMap((directory) => collectRuntimeSources(directory, directory))
 
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter/, name)
@@ -171,6 +190,26 @@ test('runtime source collection excludes dependency and generated-output directo
 
         assert.deepEqual(
             collectAdapterSources(fixtureDirectory, fixtureDirectory, false, ['node_modules', 'dist', 'build', '.turbo'])
+                .map(({ name }) => name)
+                .sort(),
+            ['runtime.js']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection reads only explicit source file types', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        fs.writeFileSync(path.join(fixtureDirectory, 'runtime.js'), "'use strict'\n")
+        fs.writeFileSync(path.join(fixtureDirectory, '.env'), 'ATLAS_TOKEN=must-not-be-read\n')
+        fs.writeFileSync(path.join(fixtureDirectory, 'upload.bin'), 'must-not-be-read\n')
+        fs.writeFileSync(path.join(fixtureDirectory, 'README.md'), 'must-not-be-read\n')
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
                 .map(({ name }) => name)
                 .sort(),
             ['runtime.js']
@@ -293,6 +332,10 @@ test('no-I/O boundary check rejects dynamic code evaluation', () => {
 
 test('no-I/O boundary check rejects indirect CommonJS runtime loading', () => {
     assert.match("module.constructor._load('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects module require capability loading', () => {
+    assert.match("module.require('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
 
 test('adapter boundary workflow runs for every pull request and push', () => {
