@@ -71,29 +71,40 @@ function assertFlowiseRuntimeDoesNotReferenceAdapter() {
     }
 }
 
-function assertFlowiseBuildGraphDoesNotReferenceAdapter() {
-    for (const [name, source] of [
+function assertFlowiseBuildGraphDoesNotReferenceAdapter(
+    sources = [
         ['pnpm-workspace.yaml', pnpmWorkspaceSource],
         ['package.json', rootPackageSource],
         ['turbo.json', turboSource]
-    ]) {
-        assert.doesNotMatch(source, /(?:^|[\s"'`])(?:\.\/)?atlas(?:[\\/]|-agentflow-adapter\b)/im, name)
+    ]
+) {
+    for (const [name, source] of sources) {
+        assert.doesNotMatch(source, /(?:^|[\s"'`])(?:\.\/)?atlas(?:[\\/]|-agentflow-adapter\b|["'\s]|$)/im, name)
     }
 }
 
 function assertValidationInvocationRunsBeforeAdapterLoads(source) {
     const normalizedSource = source.replace(/\r\n/g, '\n')
-    const validationInvocation = 'assertAdapterSourcesAreSafe()\n\nfunction loadVerifiedAdapter'
-    const validationOffset = normalizedSource.indexOf(validationInvocation)
-    const adapterLoadOffset = normalizedSource.lastIndexOf('function loadVerifiedAdapter')
+    const validationMatch = normalizedSource.match(/^assertAdapterSourcesAreSafe\(\)\n\nfunction loadVerifiedAdapter/m)
+    const adapterLoadOffset = normalizedSource.lastIndexOf("return require('./adapter')")
 
-    assert.notEqual(validationOffset, -1)
+    assert.notEqual(validationMatch, null)
     assert.notEqual(adapterLoadOffset, -1)
-    assert.ok(validationOffset < adapterLoadOffset)
+    assert.ok(validationMatch.index < adapterLoadOffset, 'Adapter source validation must run before the adapter load.')
 }
 
+test('validation placement check rejects a decoy validation marker after the adapter load', () => {
+    const source = [
+        'const marker = `assertAdapterSourcesAreSafe()\n\nfunction loadVerifiedAdapter`',
+        "function loadVerifiedAdapter() { return require('./adapter') }",
+        'assertAdapterSourcesAreSafe()'
+    ].join('\n')
+
+    assert.throws(() => assertValidationInvocationRunsBeforeAdapterLoads(source))
+})
+
 test('validation placement check accepts a CRLF-encoded source when validation precedes loading', () => {
-    const source = 'assertAdapterSourcesAreSafe()\r\n\r\nfunction loadVerifiedAdapter() {}'
+    const source = "assertAdapterSourcesAreSafe()\r\n\r\nfunction loadVerifiedAdapter() { return require('./adapter') }"
 
     assert.doesNotThrow(() => assertValidationInvocationRunsBeforeAdapterLoads(source))
 })
@@ -277,6 +288,7 @@ test('no-I/O boundary check rejects indirect CommonJS runtime loading', () => {
 
 test('adapter boundary workflow runs for every pull request and push', () => {
     assert.doesNotMatch(adapterWorkflowSource, /^\s+paths(?:-ignore)?:/m)
+    assert.doesNotMatch(adapterWorkflowSource, /^\s+branches(?:-ignore)?:/m)
     assert.match(adapterWorkflowSource, /^\s{4}pull_request:\s*$/m)
     assert.match(adapterWorkflowSource, /^\s{4}push:\s*$/m)
     assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
@@ -306,6 +318,13 @@ test('root container build context excludes the non-production adapter', () => {
 
 test('Flowise runtime sources do not import, require, or reference the non-production adapter', () => {
     assertFlowiseRuntimeDoesNotReferenceAdapter()
+})
+
+test('Flowise build-graph guard rejects a bare atlas workspace entry', () => {
+    assert.throws(
+        () => assertFlowiseBuildGraphDoesNotReferenceAdapter([['pnpm-workspace.yaml', "packages:\n  - 'atlas'"]]),
+        /pnpm-workspace.yaml/
+    )
 })
 
 test('Flowise build-graph manifests do not wire in the non-production adapter', () => {

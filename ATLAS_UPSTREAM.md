@@ -30,16 +30,22 @@ than following upstream `main` automatically.
 ## Inherited automation review gate
 
 The pinned upstream tree includes `autoSyncSingleCommit.yml`,
-`autoSyncMergedPullRequest.yml`, and `docker-image.yml`. They were inherited
-unchanged and were not run, configured, or relied upon by the Atlas Phase-0
-work. They are not opt-in: a push to `main` and a merged pull request against
-`main` can trigger the auto-sync workflows, while `docker-image.yml` can be
-started manually and builds the separate `docker/Dockerfile` path. Do not merge
-Atlas work to `main` or run the image-publishing workflow until a separate
-security decision has reviewed their external repository-dispatch behavior,
-secrets, privileges, `pull_request_target` trigger, untrusted pull-request
-metadata handling, image provenance, publishing destination, and the unpinned
-runtime installation in `docker/Dockerfile`. This policy does not authorize an
+`autoSyncMergedPullRequest.yml`, `docker-image.yml`, `main.yml`, and
+`test_docker_build.yml`. They were inherited unchanged and were not run,
+configured, or relied upon by the Atlas Phase-0 work. The auto-sync workflows
+can run from a push to `main` or a merged pull request against `main`;
+`docker-image.yml` can be started manually and builds the separate
+`docker/Dockerfile` path. `main.yml` and `test_docker_build.yml` run for pull
+requests and respectively install/build/start Flowise for Cypress and build the
+root container image. `test_docker_build.yml` has no explicit permissions block
+and its checkout action is tag-pinned, not SHA-pinned; do not treat its default
+token posture as equivalent to the Atlas-authored boundary workflow. Do not
+merge Atlas work to `main` or run the image-publishing workflow until a separate
+security decision has reviewed the inherited workflows' external
+repository-dispatch behavior, secrets, privileges, `pull_request_target`
+trigger, untrusted pull-request metadata handling, dependency lifecycle
+execution, image provenance, publishing destination, and the unpinned runtime
+installation in `docker/Dockerfile`. This policy does not authorize an
 automatic upstream synchronization or image publication.
 
 ## Frozen-version security review gate
