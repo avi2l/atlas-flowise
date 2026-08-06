@@ -12,7 +12,7 @@ function assertSupportedDirectoryEntry(entry, entryPath) {
     }
 }
 
-function collectAdapterSources(directory, rootDirectory = directory, rejectUnsupportedEntries = false) {
+function collectAdapterSources(directory, rootDirectory = directory, rejectUnsupportedEntries = false, ignoredDirectories = []) {
     const sourceFiles = []
 
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -22,8 +22,8 @@ function collectAdapterSources(directory, rootDirectory = directory, rejectUnsup
             assertSupportedDirectoryEntry(entry, entryPath)
         }
 
-        if (entry.isDirectory()) {
-            sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory, rejectUnsupportedEntries))
+        if (entry.isDirectory() && !ignoredDirectories.includes(entry.name)) {
+            sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory, rejectUnsupportedEntries, ignoredDirectories))
         } else if (entry.isFile()) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
@@ -39,9 +39,11 @@ const adapterDirectoryEntries = collectAdapterSources(__dirname, __dirname, true
 const adapterSources = adapterDirectoryEntries.filter(({ name }) => name === 'adapter.js')
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
+const adapterReadmeSource = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.join(__dirname, '../../docker')]
+const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
     /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\bmodule\.constructor\._load\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
@@ -57,7 +59,9 @@ function assertAdapterSourcesAreSafe() {
 }
 
 function assertFlowiseRuntimeDoesNotReferenceAdapter() {
-    const runtimeSources = flowiseRuntimeDirectories.flatMap((directory) => collectAdapterSources(directory))
+    const runtimeSources = flowiseRuntimeDirectories.flatMap((directory) =>
+        collectAdapterSources(directory, directory, false, flowiseRuntimeIgnoredDirectories)
+    )
 
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter/, name)
@@ -123,8 +127,33 @@ test('Phase 0 documentation defers permissive Flowise browser controls to privat
     assert.match(phaseZeroDocumentationSource, /IFRAME_ORIGINS/)
 })
 
+test('adapter README identifies adapter.js as the limited static-tripwire scope', () => {
+    assert.match(adapterReadmeSource, /static tripwire is limited\s+to `adapter\.js`/)
+})
+
 test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
     assertAdapterSourcesAreSafe()
+})
+
+test('runtime source collection excludes dependency and generated-output directories', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        fs.writeFileSync(path.join(fixtureDirectory, 'runtime.js'), "'use strict'\n")
+        for (const directory of ['node_modules', 'dist', 'build', '.turbo']) {
+            fs.mkdirSync(path.join(fixtureDirectory, directory))
+            fs.writeFileSync(path.join(fixtureDirectory, directory, 'generated.js'), "'use strict'\n")
+        }
+
+        assert.deepEqual(
+            collectAdapterSources(fixtureDirectory, fixtureDirectory, false, ['node_modules', 'dist', 'build', '.turbo'])
+                .map(({ name }) => name)
+                .sort(),
+            ['runtime.js']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
 })
 
 test('adapter source collector covers nested JavaScript module variants', () => {

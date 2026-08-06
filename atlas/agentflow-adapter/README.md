@@ -12,8 +12,8 @@ Both `run()` and `abort()` always reject with
 They do not inspect caller arguments, make network calls, read
 configuration or environment variables, accept credentials, persist data, or
 call Flowise. Its declared dependency list is intentionally empty. The contract
-test closed-lists every file in this directory and includes a deliberately
-limited static tripwire for imports and common filesystem, network,
+test closed-lists every file in this directory. Its static tripwire is limited
+to `adapter.js` and rejects imports and common filesystem, network,
 process-environment, and child-process access; neither check is a complete proof
 against every indirect JavaScript runtime capability.
 
