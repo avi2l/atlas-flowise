@@ -89,6 +89,8 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         const entryPath = path.join(directory, entry.name)
 
+        assertSupportedDirectoryEntry(entry, entryPath)
+
         if (entry.isDirectory() && !flowiseRuntimeIgnoredDirectories.includes(entry.name)) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
         } else if (entry.isFile() && runtimeSourceExtensions.has(path.extname(entry.name))) {
@@ -236,6 +238,23 @@ test('runtime source collection reads only explicit source file types', () => {
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection rejects a symbolic link instead of silently skipping it', () => {
+    const originalReadDirectory = fs.readdirSync
+    const symbolicLink = {
+        name: 'adapter-link.js',
+        isDirectory: () => false,
+        isFile: () => false
+    }
+
+    try {
+        fs.readdirSync = () => [symbolicLink]
+
+        assert.throws(() => collectRuntimeSources('runtime-directory'), /Unsupported adapter boundary entry/)
+    } finally {
+        fs.readdirSync = originalReadDirectory
     }
 })
 
