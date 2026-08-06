@@ -108,9 +108,11 @@ Do **not** implement a transport until Atlas approves all of the following:
    credentials and encryption material, including `FLOWISE_SECRETKEY_OVERWRITE`,
    `SECRETKEY_PATH`, and Flowise's credential store. Phase 0 does not authorize
    putting Atlas or third-party production secrets in Flowise.
-8. Data classification, redaction, retention, and approved handling of inputs,
-   outputs, uploads, traces, telemetry, and logs, including Flowise's
+8. Data classification, redaction, retention, erasure, and approved handling of
+   inputs, outputs, uploads, traces, telemetry, and logs, including Flowise's
    default-on telemetry posture and its `DISABLE_FLOWISE_TELEMETRY` control.
+   The decision must assign responsibility for deletion and verify erasure from
+   Flowise-held state, backups, and any queue-mode copies.
 9. A version-specific, allow-listed input contract that rejects Flowise
    `overrideConfig`, node-input, variable, credential-reference, and upload
    overrides unless Atlas explicitly authorizes each capability.

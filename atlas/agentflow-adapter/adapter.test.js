@@ -429,8 +429,10 @@ test('Phase 0 documentation does not preserve a stale contract-test count', () =
     assert.doesNotMatch(phaseZeroDocumentationSource, /# \d+ pass, \d+ fail/)
 })
 
-test('Phase 0 documentation defers tenancy, resource, and queue containment decisions', () => {
+test('Phase 0 documentation defers tenancy, erasure, resource, and queue containment decisions', () => {
     assert.match(phaseZeroDocumentationSource, /shared Flowise instance/i)
+    assert.match(phaseZeroDocumentationSource, /erasure/i)
+    assert.match(phaseZeroDocumentationSource, /backup/i)
     assert.match(phaseZeroDocumentationSource, /resource exhaustion/i)
     assert.match(phaseZeroDocumentationSource, /queue mode/i)
 })
