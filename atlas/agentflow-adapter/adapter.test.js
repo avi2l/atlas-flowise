@@ -68,6 +68,8 @@ const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'u
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.join(__dirname, '../../docker')]
+const flowiseWorkflowDirectory = path.join(__dirname, '../../.github/workflows')
+const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
 const flowiseRuntimeFiles = [path.join(__dirname, '../../Dockerfile')]
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
@@ -107,16 +109,21 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
     return sourceFiles
 }
 
-function assertFlowiseRuntimeDoesNotReferenceAdapter() {
-    const runtimeSources = flowiseRuntimeDirectories
+function collectFlowiseRuntimeSources() {
+    return flowiseRuntimeDirectories
         .flatMap((directory) => collectRuntimeSources(directory, directory))
         .concat(
+            collectRuntimeSources(flowiseWorkflowDirectory, flowiseWorkflowDirectory).filter(
+                ({ name }) => name !== atlasAdapterWorkflowName
+            ),
             flowiseRuntimeFiles.map((filePath) => ({
                 name: path.basename(filePath),
                 source: fs.readFileSync(filePath, 'utf8')
             }))
         )
+}
 
+function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter/, name)
     }
@@ -463,8 +470,8 @@ test('adapter boundary workflow runs for every pull request and push', () => {
     assert.doesNotMatch(adapterWorkflowSource, /node --test[^\n]*(?:\*|\?|\[)/, 'Adapter workflow must not execute test-file globs')
 })
 
-test('Phase 0 documentation accurately describes the adapter workflow trigger scope', () => {
-    assert.doesNotMatch(phaseZeroDocumentationSource, /scoped pushes/)
+test('Phase 0 documentation warns that opening a PR remains gated', () => {
+    assert.match(phaseZeroDocumentationSource, /Do not open a Phase-0 PR/i)
 })
 
 test('Phase 0 documentation does not preserve a stale contract-test count', () => {
@@ -491,6 +498,16 @@ test('root container build context excludes the non-production adapter', () => {
 
 test('Flowise runtime sources do not import, require, or reference the non-production adapter', () => {
     assertFlowiseRuntimeDoesNotReferenceAdapter()
+})
+
+test('Flowise workflow sources cannot couple inherited CI to the non-production adapter', () => {
+    assert.throws(
+        () =>
+            assertFlowiseRuntimeDoesNotReferenceAdapter([
+                { name: 'main.yml', source: 'node --test atlas/agentflow-adapter/adapter.test.js' }
+            ]),
+        /main.yml/
+    )
 })
 
 test('Flowise build-graph guard rejects a bare atlas workspace entry', () => {
