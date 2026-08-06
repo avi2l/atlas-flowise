@@ -44,7 +44,7 @@ const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerig
 const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.join(__dirname, '../../docker')]
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|globalThis)\b|\b(?:eval|Function|fetch)\b|\bmodule\.constructor\._load\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -229,12 +229,17 @@ test('no-I/O boundary check rejects dynamic code evaluation', () => {
     assert.match("new Function('return arbitraryValue')", prohibitedRuntimeAccess)
 })
 
+test('no-I/O boundary check rejects indirect CommonJS runtime loading', () => {
+    assert.match("module.constructor._load('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
+})
+
 test('adapter boundary workflow runs for every pull request and push', () => {
     assert.doesNotMatch(adapterWorkflowSource, /^\s+paths(?:-ignore)?:/m)
     assert.match(adapterWorkflowSource, /^\s{4}pull_request:\s*$/m)
     assert.match(adapterWorkflowSource, /^\s{4}push:\s*$/m)
     assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
     assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
+    assert.match(adapterWorkflowSource, /timeout-minutes:\s*5/)
     assert.match(adapterWorkflowSource, /node --test atlas\/agentflow-adapter\/\*\.test\.js/)
 })
 
