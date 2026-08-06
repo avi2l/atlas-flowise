@@ -312,6 +312,18 @@ test('Flowise build-graph manifests do not wire in the non-production adapter', 
     assertFlowiseBuildGraphDoesNotReferenceAdapter()
 })
 
+test('non-production adapter exposes only its closed disabled contract', () => {
+    const adapterModule = loadVerifiedAdapter()
+    const adapter = adapterModule.createNonProductionAdapter()
+
+    assert.deepEqual(Object.keys(adapterModule).sort(), [
+        'NON_PRODUCTION_ADAPTER_DEPENDENCIES',
+        'NonProductionAdapterError',
+        'createNonProductionAdapter'
+    ])
+    assert.deepEqual(Object.keys(adapter).sort(), ['abort', 'enabled', 'run'])
+})
+
 test('non-production adapter rejects construction and run arguments without inspecting caller data', async () => {
     const { createNonProductionAdapter, NonProductionAdapterError, NON_PRODUCTION_ADAPTER_DEPENDENCIES } = loadVerifiedAdapter()
     const adapter = createNonProductionAdapter(inaccessibleRequest(), inaccessibleRequest())
