@@ -29,14 +29,18 @@ than following upstream `main` automatically.
 
 ## Inherited automation review gate
 
-The pinned upstream tree includes `autoSyncSingleCommit.yml` and
-`autoSyncMergedPullRequest.yml`. They were inherited unchanged and were not
-run, configured, or relied upon by the Atlas Phase-0 work. They are not
-opt-in: a push to `main` and a merged pull request against `main` can trigger
-them. Do not merge Atlas work to `main` until a separate security decision has
-reviewed their external repository-dispatch behavior, secrets, privileges,
-`pull_request_target` trigger, and untrusted pull-request metadata handling.
-This policy does not authorize an automatic upstream synchronization.
+The pinned upstream tree includes `autoSyncSingleCommit.yml`,
+`autoSyncMergedPullRequest.yml`, and `docker-image.yml`. They were inherited
+unchanged and were not run, configured, or relied upon by the Atlas Phase-0
+work. They are not opt-in: a push to `main` and a merged pull request against
+`main` can trigger the auto-sync workflows, while `docker-image.yml` can be
+started manually and builds the separate `docker/Dockerfile` path. Do not merge
+Atlas work to `main` or run the image-publishing workflow until a separate
+security decision has reviewed their external repository-dispatch behavior,
+secrets, privileges, `pull_request_target` trigger, untrusted pull-request
+metadata handling, image provenance, publishing destination, and the unpinned
+runtime installation in `docker/Dockerfile`. This policy does not authorize an
+automatic upstream synchronization or image publication.
 
 ## Frozen-version security review gate
 

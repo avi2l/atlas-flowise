@@ -115,8 +115,8 @@ Do **not** implement a transport until Atlas approves all of the following:
    `overrideConfig`, node-input, variable, credential-reference, and upload
    overrides unless Atlas explicitly authorizes each capability.
 10. Ownership and cadence or advisory triggers for security review of the frozen
-   Flowise `2.2.7` release and its dependencies, without permitting automatic
-   upstream synchronization.
+    Flowise `2.2.7` release and its dependencies, without permitting automatic
+    upstream synchronization.
 11. Whether a shared Flowise instance is permitted or whether an instance must
     be isolated per tenant or trust domain. The decision must account for
     Flowise-internal chatflow definitions, credential store, uploads, chat
@@ -130,13 +130,15 @@ Do **not** implement a transport until Atlas approves all of the following:
     redaction, access-control, and operational-ownership decisions.
 
 These are architecture decisions with security impact. Their absence is why
-this Phase-0 adapter stays disabled. The inherited repository-dispatch
-workflows are also deferred for a separate GitHub Actions security review; they
-can be triggered by merging work to `main`, so this branch must not be merged
-to `main` until that decision is recorded. In particular,
-`autoSyncMergedPullRequest.yml` uses `pull_request_target`, an external token,
-and raw PR-title interpolation in JSON payload construction. This work neither
-runs nor configures them.
+this Phase-0 adapter stays disabled. The inherited repository-dispatch and
+image-publishing workflows are also deferred for a separate GitHub Actions and
+supply-chain security review; the auto-sync workflows can be triggered by
+merging work to `main`, while `docker-image.yml` can manually build the
+unaudited `docker/Dockerfile` path and publish an image. This branch must not
+be merged to `main`, and the image-publishing workflow must not be run, until
+those decisions are recorded. In particular, `autoSyncMergedPullRequest.yml`
+uses `pull_request_target`, an external token, and raw PR-title interpolation
+in JSON payload construction. This work neither runs nor configures them.
 
 ## Verification
 

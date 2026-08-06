@@ -40,6 +40,9 @@ const adapterSources = adapterDirectoryEntries.filter(({ name }) => name === 'ad
 const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
 const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
 const adapterReadmeSource = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8')
+const pnpmWorkspaceSource = fs.readFileSync(path.join(__dirname, '../../pnpm-workspace.yaml'), 'utf8')
+const rootPackageSource = fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8')
+const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.join(__dirname, '../../docker')]
@@ -65,6 +68,16 @@ function assertFlowiseRuntimeDoesNotReferenceAdapter() {
 
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter/, name)
+    }
+}
+
+function assertFlowiseBuildGraphDoesNotReferenceAdapter() {
+    for (const [name, source] of [
+        ['pnpm-workspace.yaml', pnpmWorkspaceSource],
+        ['package.json', rootPackageSource],
+        ['turbo.json', turboSource]
+    ]) {
+        assert.doesNotMatch(source, /(?:^|[\s"'`])(?:\.\/)?atlas(?:[\\/]|-agentflow-adapter\b)/im, name)
     }
 }
 
@@ -293,6 +306,10 @@ test('root container build context excludes the non-production adapter', () => {
 
 test('Flowise runtime sources do not import, require, or reference the non-production adapter', () => {
     assertFlowiseRuntimeDoesNotReferenceAdapter()
+})
+
+test('Flowise build-graph manifests do not wire in the non-production adapter', () => {
+    assertFlowiseBuildGraphDoesNotReferenceAdapter()
 })
 
 test('non-production adapter rejects construction and run arguments without inspecting caller data', async () => {

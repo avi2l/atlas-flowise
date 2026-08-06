@@ -11,7 +11,7 @@ Both `run()` and `abort()` always reject with
 `ATLAS_AGENTFLOW_ADAPTER_DISABLED` and report only the attempted operation.
 They do not inspect caller arguments, make network calls, read
 configuration or environment variables, accept credentials, persist data, or
-call Flowise. Its declared dependency list is intentionally empty. The contract
+call Flowise. Its exported dependency declaration is intentionally empty. The contract
 test closed-lists every file in this directory. Its static tripwire is limited
 to `adapter.js` and rejects imports and common filesystem, network,
 process-environment, and child-process access; neither check is a complete proof
