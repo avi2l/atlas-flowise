@@ -57,7 +57,9 @@ function readAdapterSourceFiles(directory) {
 
 const adapterDirectoryEntries = readAdapterSourceFiles(__dirname)
 const adapterSources = adapterDirectoryEntries.filter(({ name }) => name === 'adapter.js')
-const adapterWorkflowSource = fs.readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
+const adapterWorkflowSource = fs
+    .readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
+    .replace(/\r\n/g, '\n')
 const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
 const adapterReadmeSource = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8')
 const pnpmWorkspaceSource = fs.readFileSync(path.join(__dirname, '../../pnpm-workspace.yaml'), 'utf8')
@@ -415,7 +417,8 @@ test('adapter boundary workflow runs for every pull request and push', () => {
     assert.match(adapterWorkflowSource, /persist-credentials:\s*false/)
     assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
     assert.match(adapterWorkflowSource, /timeout-minutes:\s*5/)
-    assert.match(adapterWorkflowSource, /node --test atlas\/agentflow-adapter\/\*\.test\.js/)
+    assert.match(adapterWorkflowSource, /^\s*-\s+run:\s+node --test atlas\/agentflow-adapter\/adapter\.test\.js\s*$/m)
+    assert.doesNotMatch(adapterWorkflowSource, /node --test[^\n]*(?:\*|\?|\[)/, 'Adapter workflow must not execute test-file globs')
 })
 
 test('Phase 0 documentation accurately describes the adapter workflow trigger scope', () => {
