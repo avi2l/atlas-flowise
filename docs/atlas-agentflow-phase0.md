@@ -199,11 +199,11 @@ node --test atlas/agentflow-adapter/adapter.test.js
 ```
 
 The standalone `Atlas AgentFlow Adapter Boundary` workflow is configured to run
-this contract on both pull requests and all pushes with Node 20, without
-installing or starting Flowise. **Do not open a Phase-0 PR to exercise this
-workflow:** the inherited PR workflows would install/start Flowise with its
-default telemetry posture until the separate CI and telemetry security decision
-is recorded. The contract also protects the root container-build exclusion for
+this contract on every push with Node 20, without installing or starting
+Flowise. It intentionally has no pull-request trigger: **Do not open a Phase-0
+PR** to exercise this workflow, because the inherited PR workflows would
+install/start Flowise with its default telemetry posture until the separate CI
+and telemetry security decision is recorded. The contract also protects the root container-build exclusion for
 `atlas/`; its build-context exclusion check does not apply to the separate
 inherited `docker/Dockerfile`, which does not copy the repository context. The
 inherited standard Flowise CI workflow was intentionally left unchanged to avoid

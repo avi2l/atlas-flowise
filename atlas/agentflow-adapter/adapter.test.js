@@ -455,23 +455,38 @@ test('no-I/O boundary check rejects module require capability loading', () => {
     assert.match("module.require('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
 
-test('adapter boundary workflow runs for every pull request and push', () => {
-    assert.doesNotMatch(adapterWorkflowSource, /^\s+paths(?:-ignore)?:/m)
-    assert.doesNotMatch(adapterWorkflowSource, /^\s+branches(?:-ignore)?:/m)
-    assert.match(adapterWorkflowSource, /^\s{4}pull_request:\s*$/m)
-    assert.match(adapterWorkflowSource, /^\s{4}push:\s*$/m)
-    assert.match(adapterWorkflowSource, /^permissions:\n\s{4}contents: read$/m)
-    assert.doesNotMatch(adapterWorkflowSource, /pull_request_target|secrets\./)
-    assert.match(adapterWorkflowSource, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/)
-    assert.match(adapterWorkflowSource, /persist-credentials:\s*false/)
-    assert.match(adapterWorkflowSource, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/)
-    assert.match(adapterWorkflowSource, /timeout-minutes:\s*5/)
-    assert.match(adapterWorkflowSource, /^\s*-\s+run:\s+node --test atlas\/agentflow-adapter\/adapter\.test\.js\s*$/m)
-    assert.doesNotMatch(adapterWorkflowSource, /node --test[^\n]*(?:\*|\?|\[)/, 'Adapter workflow must not execute test-file globs')
+test('adapter boundary workflow is a closed, push-only, read-only contract', () => {
+    assert.equal(
+        adapterWorkflowSource,
+        [
+            'name: Atlas AgentFlow Adapter Boundary',
+            '',
+            'on:',
+            '    push:',
+            '',
+            'permissions:',
+            '    contents: read',
+            '',
+            'jobs:',
+            '    adapter-contract:',
+            '        name: Disabled adapter contract',
+            '        runs-on: ubuntu-latest',
+            '        timeout-minutes: 5',
+            '        steps:',
+            '            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
+            '              with:',
+            '                  persist-credentials: false',
+            '            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4',
+            '              with:',
+            '                  node-version: 20',
+            '            - run: node --test atlas/agentflow-adapter/adapter.test.js',
+            ''
+        ].join('\n')
+    )
 })
 
 test('Phase 0 documentation warns that opening a PR remains gated', () => {
-    assert.match(phaseZeroDocumentationSource, /Do not open a Phase-0 PR/i)
+    assert.match(phaseZeroDocumentationSource, /Do not open a Phase-0\s+PR/i)
 })
 
 test('Phase 0 documentation does not preserve a stale contract-test count', () => {

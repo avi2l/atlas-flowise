@@ -1,7 +1,6 @@
 name: Atlas AgentFlow Adapter Boundary
 
 on:
-    pull_request:
     push:
 
 permissions:
