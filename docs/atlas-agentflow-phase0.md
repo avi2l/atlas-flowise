@@ -203,13 +203,14 @@ this contract on every push with Node 20, without installing or starting
 Flowise. It intentionally has no pull-request trigger: **Do not open a Phase-0
 PR** to exercise this workflow, because the inherited PR workflows would
 install/start Flowise with its default telemetry posture until the separate CI
-and telemetry security decision is recorded. The contract also protects the root container-build exclusion for
-`atlas/`; its build-context exclusion check does not apply to the separate
-inherited `docker/Dockerfile`, which does not copy the repository context. The
-inherited standard Flowise CI workflow was intentionally left unchanged to avoid
-coupling this isolated check to a full Flowise dependency installation. The
-`atlas/` directory is excluded from Flowise container build contexts, preserving
-the skeleton's separation from Flowise runtime images.
+and telemetry security decision is recorded. The contract also protects the root
+container-build exclusion for `atlas/`. The separate inherited `docker/Dockerfile`
+is built with the repository context, which is also subject to `.dockerignore`,
+but it does not copy repository files into its image. The inherited standard
+Flowise CI workflow was intentionally left unchanged to avoid coupling this
+isolated check to a full Flowise dependency installation. The `atlas/` directory
+is excluded from Flowise container build contexts, preserving the skeleton's
+separation from Flowise runtime images.
 
 The repository-wide Flowise build was not treated as a release signal in this
 Phase-0 change: the local environment has Node `24.14.0`, while the pinned

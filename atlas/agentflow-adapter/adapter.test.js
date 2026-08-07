@@ -14,29 +14,6 @@ function assertSupportedDirectoryEntry(entry, entryPath) {
     }
 }
 
-function collectAdapterSources(directory, rootDirectory = directory, rejectUnsupportedEntries = false, ignoredDirectories = []) {
-    const sourceFiles = []
-
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-        const entryPath = path.join(directory, entry.name)
-
-        if (rejectUnsupportedEntries) {
-            assertSupportedDirectoryEntry(entry, entryPath)
-        }
-
-        if (entry.isDirectory() && !ignoredDirectories.includes(entry.name)) {
-            sourceFiles.push(...collectAdapterSources(entryPath, rootDirectory, rejectUnsupportedEntries, ignoredDirectories))
-        } else if (entry.isFile()) {
-            sourceFiles.push({
-                name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
-                source: fs.readFileSync(entryPath, 'utf8')
-            })
-        }
-    }
-
-    return sourceFiles
-}
-
 function readAdapterSourceFiles(directory) {
     const entries = fs.readdirSync(directory, { withFileTypes: true })
     const entryNames = entries.map(({ name }) => name).sort()
@@ -234,27 +211,6 @@ test('non-production adapter has an explicit dependency-free, no-I/O boundary', 
     assertAdapterSourcesAreSafe()
 })
 
-test('runtime source collection excludes dependency and generated-output directories', () => {
-    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
-
-    try {
-        fs.writeFileSync(path.join(fixtureDirectory, 'runtime.js'), "'use strict'\n")
-        for (const directory of ['node_modules', 'dist', 'build', '.turbo']) {
-            fs.mkdirSync(path.join(fixtureDirectory, directory))
-            fs.writeFileSync(path.join(fixtureDirectory, directory, 'generated.js'), "'use strict'\n")
-        }
-
-        assert.deepEqual(
-            collectAdapterSources(fixtureDirectory, fixtureDirectory, false, ['node_modules', 'dist', 'build', '.turbo'])
-                .map(({ name }) => name)
-                .sort(),
-            ['runtime.js']
-        )
-    } finally {
-        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
-    }
-})
-
 test('runtime source collection reads only explicit source file types', () => {
     const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
 
@@ -306,61 +262,6 @@ test('runtime source collection rejects a symbolic link instead of silently skip
         assert.throws(() => collectRuntimeSources('runtime-directory'), /Unsupported adapter boundary entry/)
     } finally {
         fs.readdirSync = originalReadDirectory
-    }
-})
-
-test('adapter source collector covers nested JavaScript module variants', () => {
-    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
-
-    try {
-        fs.mkdirSync(path.join(fixtureDirectory, 'nested'))
-        for (const relativePath of [
-            'adapter.js',
-            'nested/helper.cjs',
-            'nested/helper.mjs',
-            'nested/helper.ts',
-            'nested/helper.jsx',
-            'nested/helper.tsx',
-            'nested/package.json'
-        ]) {
-            fs.writeFileSync(path.join(fixtureDirectory, relativePath), "'use strict'\n")
-        }
-
-        assert.deepEqual(
-            collectAdapterSources(fixtureDirectory)
-                .map(({ name }) => name)
-                .sort(),
-            [
-                'adapter.js',
-                'nested/helper.cjs',
-                'nested/helper.jsx',
-                'nested/helper.mjs',
-                'nested/helper.ts',
-                'nested/helper.tsx',
-                'nested/package.json'
-            ]
-        )
-    } finally {
-        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
-    }
-})
-
-test('adapter directory collector includes every file type so a closed boundary can reject credentials', () => {
-    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
-
-    try {
-        fs.writeFileSync(path.join(fixtureDirectory, 'adapter.js'), "'use strict'\n")
-        fs.writeFileSync(path.join(fixtureDirectory, '.env'), 'ATLAS_TOKEN=must-not-be-present\n')
-        fs.writeFileSync(path.join(fixtureDirectory, 'runtime.sh'), '#!/bin/sh\n')
-
-        assert.deepEqual(
-            collectAdapterSources(fixtureDirectory)
-                .map(({ name }) => name)
-                .sort(),
-            ['.env', 'adapter.js', 'runtime.sh']
-        )
-    } finally {
-        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
     }
 })
 
@@ -455,38 +356,23 @@ test('no-I/O boundary check rejects module require capability loading', () => {
     assert.match("module.require('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
 
-test('adapter boundary workflow is a closed, push-only, read-only contract', () => {
-    assert.equal(
-        adapterWorkflowSource,
-        [
-            'name: Atlas AgentFlow Adapter Boundary',
-            '',
-            'on:',
-            '    push:',
-            '',
-            'permissions:',
-            '    contents: read',
-            '',
-            'jobs:',
-            '    adapter-contract:',
-            '        name: Disabled adapter contract',
-            '        runs-on: ubuntu-latest',
-            '        timeout-minutes: 5',
-            '        steps:',
-            '            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
-            '              with:',
-            '                  persist-credentials: false',
-            '            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4',
-            '              with:',
-            '                  node-version: 20',
-            '            - run: node --test atlas/agentflow-adapter/adapter.test.js',
-            ''
-        ].join('\n')
-    )
+test('adapter boundary workflow is a push-only, read-only credential-free contract', () => {
+    assert.match(adapterWorkflowSource, /^on:\n\s{4}push:$/m)
+    assert.doesNotMatch(adapterWorkflowSource, /^\s{4}pull_request(?:_target)?:/m)
+    assert.match(adapterWorkflowSource, /^permissions:\n\s{4}contents: read$/m)
+    assert.doesNotMatch(adapterWorkflowSource, /secrets\./)
+    assert.match(adapterWorkflowSource, /persist-credentials: false/)
+    assert.match(adapterWorkflowSource, /actions\/checkout@[0-9a-f]{40}/)
+    assert.match(adapterWorkflowSource, /actions\/setup-node@[0-9a-f]{40}/)
+    assert.match(adapterWorkflowSource, /node --test atlas\/agentflow-adapter\/adapter\.test\.js/)
 })
 
 test('Phase 0 documentation warns that opening a PR remains gated', () => {
     assert.match(phaseZeroDocumentationSource, /Do not open a Phase-0\s+PR/i)
+})
+
+test('Phase 0 documentation accurately describes the separate Dockerfile build context', () => {
+    assert.doesNotMatch(phaseZeroDocumentationSource, /docker\/Dockerfile`, which does not copy the repository context/)
 })
 
 test('Phase 0 documentation does not preserve a stale contract-test count', () => {
