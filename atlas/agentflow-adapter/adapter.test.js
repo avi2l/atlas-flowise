@@ -51,7 +51,7 @@ const flowiseRuntimeFiles = [path.join(__dirname, '../../Dockerfile')]
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno)\b|\b(?:eval|Function|fetch)\b|\bmodule\.constructor\._load\b|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno)\b|\b(?:eval|Function|fetch)\b|\bmodule(?:\.constructor\._load\b|\s*\[)|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -350,6 +350,10 @@ test('no-I/O boundary check rejects dynamic code evaluation', () => {
 
 test('no-I/O boundary check rejects indirect CommonJS runtime loading', () => {
     assert.match("module.constructor._load('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects computed CommonJS runtime loading', () => {
+    assert.match("module['constructor']['_load']('node:' + 'fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
 
 test('no-I/O boundary check rejects module require capability loading', () => {
