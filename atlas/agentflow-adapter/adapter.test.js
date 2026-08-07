@@ -44,8 +44,11 @@ const rootPackageSource = fs.readFileSync(path.join(__dirname, '../../package.js
 const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
-const flowiseRuntimeDirectories = [path.join(__dirname, '../../packages'), path.join(__dirname, '../../docker')]
-const flowiseWorkflowDirectory = path.join(__dirname, '../../.github/workflows')
+const flowiseRuntimeDirectories = [
+    path.join(__dirname, '../../packages'),
+    path.join(__dirname, '../../docker'),
+    path.join(__dirname, '../../.github')
+]
 const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
 const flowiseRuntimeFiles = [path.join(__dirname, '../../Dockerfile')]
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
@@ -89,10 +92,8 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
 function collectFlowiseRuntimeSources() {
     return flowiseRuntimeDirectories
         .flatMap((directory) => collectRuntimeSources(directory, directory))
+        .filter(({ name }) => name !== `workflows/${atlasAdapterWorkflowName}`)
         .concat(
-            collectRuntimeSources(flowiseWorkflowDirectory, flowiseWorkflowDirectory).filter(
-                ({ name }) => name !== atlasAdapterWorkflowName
-            ),
             flowiseRuntimeFiles.map((filePath) => ({
                 name: path.basename(filePath),
                 source: fs.readFileSync(filePath, 'utf8')
@@ -201,6 +202,11 @@ test('adapter source validation is installed before any test can load the adapte
 test('Phase 0 documentation defers permissive Flowise browser controls to private ingress', () => {
     assert.match(phaseZeroDocumentationSource, /CORS_ORIGINS/)
     assert.match(phaseZeroDocumentationSource, /IFRAME_ORIGINS/)
+})
+
+test('Phase 0 documentation records the queue administration exposure and ingress normalization gate', () => {
+    assert.match(phaseZeroDocumentationSource, /\/admin\/queues/)
+    assert.match(phaseZeroDocumentationSource, /normalize or reject traversal and encoded path forms/i)
 })
 
 test('adapter README identifies adapter.js as the limited static-tripwire scope', () => {
@@ -413,6 +419,10 @@ test('Flowise workflow sources cannot couple inherited CI to the non-production 
             ]),
         /main.yml/
     )
+})
+
+test('Flowise containment scan includes all GitHub control sources, not only workflow files', () => {
+    assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}.github`)))
 })
 
 test('Flowise build-graph guard rejects a bare atlas workspace entry', () => {
