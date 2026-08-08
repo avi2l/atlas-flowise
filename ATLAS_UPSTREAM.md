@@ -2,12 +2,12 @@
 
 ## Pinned upstream baseline
 
-- **Upstream:** https://github.com/FlowiseAI/Flowise
-- **Atlas fork:** https://github.com/avi2l/atlas-flowise
-- **Pinned release:** `flowise@2.2.7`
-- **Pinned commit:** `cf7d841f88504bba465790eb906f6d758b91ee2c`
-- **Working branch:** `atlas/pinned-flowise-2.2.7`
-- **Pinned on:** 2026-08-03
+-   **Upstream:** https://github.com/FlowiseAI/Flowise
+-   **Atlas fork:** https://github.com/avi2l/atlas-flowise
+-   **Pinned release:** `flowise@2.2.7`
+-   **Pinned commit:** `cf7d841f88504bba465790eb906f6d758b91ee2c`
+-   **Baseline branch:** `atlas/pinned-flowise-2.2.7`
+-   **Pinned on:** 2026-08-03
 
 ## Why this baseline
 
@@ -26,6 +26,37 @@ than following upstream `main` automatically.
 4. Treat Flowise as an isolated workflow/canvas runtime behind Atlas-owned APIs.
 5. Record every accepted upstream cherry-pick in this file with source commit,
    rationale, and license review.
+
+## Inherited automation review gate
+
+The pinned upstream tree includes `autoSyncSingleCommit.yml`,
+`autoSyncMergedPullRequest.yml`, `docker-image.yml`, `main.yml`, and
+`test_docker_build.yml`. They were inherited unchanged and were not run,
+configured, or relied upon by the Atlas Phase-0 work. `main.yml` and
+`test_docker_build.yml` run for pull requests only when the base branch name contains no slash (their `'*'` filter) and pushes to `main`. The auto-sync workflows
+can run from a push to `main` or a merged pull request against `main`;
+`docker-image.yml` can be started manually and builds the separate
+`docker/Dockerfile` path. They respectively install/build/start Flowise for
+Cypress and build the root container image. `test_docker_build.yml` has no
+explicit permissions block and its checkout action is tag-pinned, not SHA-pinned;
+do not treat its default
+token posture as equivalent to the Atlas-authored boundary workflow. Do not
+merge Atlas work to `main` or run the image-publishing workflow until a separate
+security decision has reviewed the inherited workflows' external
+repository-dispatch behavior, secrets, privileges, `pull_request_target`
+trigger, untrusted pull-request metadata handling, dependency lifecycle
+execution, image provenance, publishing destination, and the unpinned runtime
+installation in `docker/Dockerfile`. This policy does not authorize an
+automatic upstream synchronization or image publication.
+
+## Frozen-version security review gate
+
+The pinned release is a compatibility and license control, not a security
+maintenance plan. Before any production use, Atlas must assign an owner and a
+review cadence or advisory trigger for Flowise `2.2.7` and its dependencies.
+Each candidate remediation remains subject to the per-change security, license,
+API compatibility, and product-fit review in this policy; this does not
+authorize an upstream sync or upgrade.
 
 ## Initial scope
 
