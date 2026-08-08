@@ -55,7 +55,7 @@ const flowiseRuntimeFiles = [path.join(__dirname, '../../Dockerfile')]
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno)\b|\b(?:eval|Function|fetch)\b|\bmodule(?:\.constructor(?:\._load\b|\s*\[)|\s*\[)|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect)\b|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -104,7 +104,7 @@ function collectFlowiseRuntimeSources() {
 
 function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
     for (const { name, source } of runtimeSources) {
-        assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter/, name)
+        assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter|atlas[\\/]/, name)
     }
 }
 
@@ -366,6 +366,14 @@ test('no-I/O boundary check rejects computed environment access', () => {
     assert.match("process['env'].ATLAS_TOKEN", prohibitedRuntimeAccess)
 })
 
+test('no-I/O boundary check rejects indirect global environment access', () => {
+    assert.match("global['pro' + 'cess'].env.ATLAS_TOKEN", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects reflective CommonJS capability loading', () => {
+    assert.match("Reflect.get(module, 'req' + 'uire')('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
+})
+
 test('no-I/O boundary check rejects an aliased global fetch capability', () => {
     assert.match("const send = fetch; send('https://example.invalid')", prohibitedRuntimeAccess)
 })
@@ -492,6 +500,13 @@ test('Flowise workflow sources cannot couple inherited CI to the non-production 
                 { name: 'main.yml', source: 'node --test atlas/agentflow-adapter/adapter.test.js' }
             ]),
         /main.yml/
+    )
+})
+
+test('Flowise runtime sources cannot import a future Atlas sibling module', () => {
+    assert.throws(
+        () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source: "require('../../atlas/bridge')" }]),
+        /runtime.js/
     )
 })
 
