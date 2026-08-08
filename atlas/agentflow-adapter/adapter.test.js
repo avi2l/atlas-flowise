@@ -51,11 +51,34 @@ const flowiseRuntimeDirectories = [
     path.join(__dirname, '../../.github')
 ]
 const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
+const expectedAdapterWorkflowSource = [
+    'name: Atlas AgentFlow Adapter Boundary',
+    '',
+    'on:',
+    '    push:',
+    '',
+    'permissions:',
+    '    contents: read',
+    '',
+    'jobs:',
+    '    adapter-contract:',
+    '        name: Disabled adapter contract',
+    '        runs-on: ubuntu-latest',
+    '        timeout-minutes: 5',
+    '        steps:',
+    '            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4',
+    '              with:',
+    '                  persist-credentials: false',
+    '            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4',
+    '              with:',
+    '                  node-version: 20',
+    '            - run: node --test atlas/agentflow-adapter/adapter.test.js'
+].join('\n')
 const flowiseRuntimeFiles = [path.join(__dirname, '../../Dockerfile')]
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect)\b|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\bconstructor\s*\.\s*constructor\b|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -65,6 +88,10 @@ function assertAdapterSourcesAreSafe() {
     }
 
     assert.match(adapterSources[0].source, /const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object\.freeze\(\[\]\)/)
+}
+
+function assertAdapterWorkflowIsContained(source) {
+    assert.equal(source.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)).trim(), expectedAdapterWorkflowSource)
 }
 
 const runtimeSourceExtensions = new Set(['.cjs', '.js', '.json', '.jsx', '.mjs', '.sh', '.ts', '.tsx', '.yaml', '.yml'])
@@ -417,6 +444,11 @@ test('no-I/O boundary check rejects indirect CommonJS runtime loading', () => {
     assert.match("module.constructor._load('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
 
+test('no-I/O boundary check rejects CommonJS wrapper capability escapes', () => {
+    assert.match("arguments[1]('node:' + 'fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
+    assert.match("const F = (() => {}).constructor.constructor; F('return pro' + 'cess.env')()", prohibitedRuntimeAccess)
+})
+
 test('no-I/O boundary check rejects computed CommonJS runtime loading', () => {
     assert.match("module['constructor']['_load']('node:' + 'fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
@@ -429,15 +461,23 @@ test('no-I/O boundary check rejects module require capability loading', () => {
     assert.match("module.require('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
 
-test('adapter boundary workflow is push-only, read-only, and has no configured secret references', () => {
-    assert.match(adapterWorkflowSource, /^on:\n\s{4}push:$/m)
-    assert.doesNotMatch(adapterWorkflowSource, /^\s{4}pull_request(?:_target)?:/m)
-    assert.match(adapterWorkflowSource, /^permissions:\n\s{4}contents: read$/m)
-    assert.doesNotMatch(adapterWorkflowSource, /\bsecrets\b/i)
-    assert.match(adapterWorkflowSource, /persist-credentials: false/)
-    assert.match(adapterWorkflowSource, /actions\/checkout@[0-9a-f]{40}/)
-    assert.match(adapterWorkflowSource, /actions\/setup-node@[0-9a-f]{40}/)
-    assert.match(adapterWorkflowSource, /node --test atlas\/agentflow-adapter\/adapter\.test\.js/)
+test('adapter boundary workflow has the sole explicitly contained job and steps', () => {
+    assertAdapterWorkflowIsContained(adapterWorkflowSource)
+})
+
+test('adapter boundary workflow rejects an added job-level privilege', () => {
+    const elevatedWorkflow = adapterWorkflowSource.replace(
+        '        timeout-minutes: 5',
+        '        timeout-minutes: 5\n        permissions:\n            contents: write\n            id-token: write'
+    )
+
+    assert.throws(() => assertAdapterWorkflowIsContained(elevatedWorkflow))
+})
+
+test('adapter boundary workflow rejects an added network-capable step', () => {
+    const expandedWorkflow = `${adapterWorkflowSource}\n            - run: pnpm install`
+
+    assert.throws(() => assertAdapterWorkflowIsContained(expandedWorkflow))
 })
 
 test('Phase 0 documentation gates inherited CI for un-slashed PR bases and main merges', () => {

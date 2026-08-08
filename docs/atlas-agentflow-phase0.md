@@ -282,9 +282,9 @@ node --test atlas/agentflow-adapter/adapter.test.js
 # all adapter contract tests pass
 ```
 
-The standalone `Atlas AgentFlow Adapter Boundary` workflow is configured to run
-this contract on every push with Node 20, without installing or starting
-Flowise. It intentionally has no pull-request trigger. Review only against the
+The standalone `Atlas AgentFlow Adapter Boundary` workflow is constrained by
+this contract test to its single Node 20 contract step, without installing or
+starting Flowise. It intentionally has no pull-request trigger. Review only against the
 slash-containing pinned baseline (`atlas/pinned-flowise-2.2.7`): its slash does
 not match the inherited PR workflows' slash-free base filter. Do not target an
 un-slashed base or merge this branch to `main`, because either path can start
