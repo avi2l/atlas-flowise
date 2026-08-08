@@ -256,8 +256,8 @@ test('Phase 0 documentation defers the Flowise end-user embed surface to Atlas-o
 })
 
 test('Phase 0 documentation accurately scopes inherited Flowise pull-request triggers', () => {
-    assert.match(phaseZeroDocumentationSource, /pull requests against any base branch/i)
-    assert.match(atlasUpstreamSource, /pull requests against any base branch/i)
+    assert.match(phaseZeroDocumentationSource, /only when the base branch name contains no slash/i)
+    assert.match(atlasUpstreamSource, /only when the base branch name contains no slash/i)
 })
 
 test('adapter README identifies adapter.js as the limited static-tripwire scope', () => {
@@ -432,13 +432,13 @@ test('adapter boundary workflow is push-only, read-only, and has no configured s
     assert.match(adapterWorkflowSource, /node --test atlas\/agentflow-adapter\/adapter\.test\.js/)
 })
 
-test('Phase 0 documentation warns that opening a PR remains gated', () => {
-    assert.match(phaseZeroDocumentationSource, /Do not open a Phase-0\s+PR/i)
+test('Phase 0 documentation gates inherited CI for un-slashed PR bases and main merges', () => {
+    assert.match(phaseZeroDocumentationSource, /do not target an un-slashed branch or merge this branch to `main`/i)
 })
 
-test('Phase 0 documentation records inherited Flowise CI triggers for pull requests against any base and main pushes', () => {
-    assert.match(phaseZeroDocumentationSource, /pull requests against any base branch and pushes to `main`/i)
-    assert.match(atlasUpstreamSource, /pull requests against any base branch and pushes to `main`/i)
+test('Phase 0 documentation records inherited Flowise CI triggers for slash-free PR bases and main pushes', () => {
+    assert.match(phaseZeroDocumentationSource, /pull requests only when the base branch name contains no slash/i)
+    assert.match(atlasUpstreamSource, /pull requests only when the base branch name contains no slash/i)
 })
 
 test('Phase 0 documentation accurately describes the separate Dockerfile build context', () => {
