@@ -32,13 +32,14 @@ than following upstream `main` automatically.
 The pinned upstream tree includes `autoSyncSingleCommit.yml`,
 `autoSyncMergedPullRequest.yml`, `docker-image.yml`, `main.yml`, and
 `test_docker_build.yml`. They were inherited unchanged and were not run,
-configured, or relied upon by the Atlas Phase-0 work. The auto-sync workflows
+configured, or relied upon by the Atlas Phase-0 work. `main.yml` and
+`test_docker_build.yml` run for pull requests and pushes to `main`. The auto-sync workflows
 can run from a push to `main` or a merged pull request against `main`;
 `docker-image.yml` can be started manually and builds the separate
-`docker/Dockerfile` path. `main.yml` and `test_docker_build.yml` run for pull
-requests and respectively install/build/start Flowise for Cypress and build the
-root container image. `test_docker_build.yml` has no explicit permissions block
-and its checkout action is tag-pinned, not SHA-pinned; do not treat its default
+`docker/Dockerfile` path. They respectively install/build/start Flowise for
+Cypress and build the root container image. `test_docker_build.yml` has no
+explicit permissions block and its checkout action is tag-pinned, not SHA-pinned;
+do not treat its default
 token posture as equivalent to the Atlas-authored boundary workflow. Do not
 merge Atlas work to `main` or run the image-publishing workflow until a separate
 security decision has reviewed the inherited workflows' external

@@ -38,6 +38,7 @@ const adapterWorkflowSource = fs
     .readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
     .replace(/\r\n/g, '\n')
 const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
+const atlasUpstreamSource = fs.readFileSync(path.join(__dirname, '../../ATLAS_UPSTREAM.md'), 'utf8')
 const adapterReadmeSource = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8')
 const pnpmWorkspaceSource = fs.readFileSync(path.join(__dirname, '../../pnpm-workspace.yaml'), 'utf8')
 const rootPackageSource = fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8')
@@ -379,6 +380,11 @@ test('adapter boundary workflow is a push-only, read-only credential-free contra
 
 test('Phase 0 documentation warns that opening a PR remains gated', () => {
     assert.match(phaseZeroDocumentationSource, /Do not open a Phase-0\s+PR/i)
+})
+
+test('Phase 0 documentation records inherited Flowise CI triggers for both pull requests and main pushes', () => {
+    assert.match(phaseZeroDocumentationSource, /pull requests and pushes to `main`/i)
+    assert.match(atlasUpstreamSource, /pull requests and pushes to `main`/i)
 })
 
 test('Phase 0 documentation accurately describes the separate Dockerfile build context', () => {
