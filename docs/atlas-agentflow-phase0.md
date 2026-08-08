@@ -116,13 +116,51 @@ do not embed the Flowise widget, iframe, canvas, or public chatbot routes in an
 Atlas product without a separate approved UX, supply-chain, and authorization
 design.
 
+## Additional compatibility boundaries
+
+### SSE `chatId` is a runtime capability
+
+Flowise's `SSEStreamer` keeps live output streams in an instance-wide map keyed
+by client-supplied `chatId`. The prediction controller registers that stream
+before the later flow API-key validation path. Consequently, inside Flowise a
+`chatId` is a capability that selects a live output sink; it is not merely an
+opaque conversational label. A caller that can choose another live `chatId`
+can disrupt or receive that stream before its own request is rejected.
+
+Phase 0 does not authorize SSE transport. Any future Atlas boundary must not
+pass a caller-controlled `chatId` through to Flowise. If a Flowise `chatId` is
+ever required, it must be Atlas-minted, unguessable, isolated from other trust
+domains, and treated as sensitive runtime capability data. This exposure is an
+additional reason that shared-instance and tenancy decisions remain a hard
+stop gate.
+
+### Flowise API keys are instance-global
+
+The pinned release validates a bare key against the Flowise instance; every
+valid Flowise API key can access every non-whitelisted API route. A key is not
+scoped to a flow, tenant, or route. In particular, a future Atlas credential
+exchange cannot obtain a natively Flowise-scoped credential from this release.
+That constraint must be resolved by the separate Atlas authorization and
+deployment-containment design, not by passing an Atlas credential to Flowise.
+
+### Canonical paths are required before Flowise authorization
+
+Before its authorization middleware, Flowise's `sanitizeMiddleware` rewrites
+`req.url` with `sanitizeHtml(decodeURI(req.url))`. Its prefix-based route
+decisions therefore operate on a transformed URL, not necessarily the original
+wire path. Private ingress must reject any path that is not already canonical
+before its own route policy or allow-list is evaluated; normalization alone is
+not sufficient. This work does not authorize changing Flowise's middleware or
+relying on it as an ingress control.
+
 ## Repository-automation reconnaissance
 
 As observed on 2026-08-06, `avi2l/atlas-flowise` has no repository Actions
 secrets configured and its `main` branch has no branch-protection rule. This
-means the inherited auto-sync and image-publish workflows were not armed with
-repository secrets at the time of this check, but the lack of branch protection
-leaves their `main` triggers governed only by process. The inherited
+means no repository-scoped secrets were configured at the time of this check,
+but it does not establish the absence of organization-level or environment-level
+secrets. The lack of branch protection leaves their `main` triggers governed
+only by process.
 `autoSyncSingleCommit.yml` and `autoSyncMergedPullRequest.yml` dispatch commit
 or pull-request metadata to the repository named by `AUTOSYNC_CH_URL` when
 `AUTOSYNC_*` secrets are later added; the latter also uses

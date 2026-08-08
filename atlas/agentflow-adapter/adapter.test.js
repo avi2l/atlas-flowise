@@ -223,6 +223,23 @@ test('Phase 0 documentation records the queue administration exposure and ingres
     assert.match(phaseZeroDocumentationSource, /normalize or reject traversal and encoded path forms/i)
 })
 
+test('Phase 0 documentation records the Flowise SSE chatId capability and unscoped API-key boundary', () => {
+    assert.match(phaseZeroDocumentationSource, /chatId.*capability/i)
+    assert.match(phaseZeroDocumentationSource, /Atlas-minted.*unguessable/i)
+    assert.match(phaseZeroDocumentationSource, /every\s+valid Flowise API key/i)
+    assert.match(phaseZeroDocumentationSource, /not\s+scoped to a flow, tenant, or route/i)
+})
+
+test('Phase 0 documentation requires canonical ingress paths before Flowise rewrites URLs', () => {
+    assert.match(phaseZeroDocumentationSource, /sanitizeMiddleware/)
+    assert.match(phaseZeroDocumentationSource, /decodeURI/)
+    assert.match(phaseZeroDocumentationSource, /reject any path that is not already canonical/i)
+})
+
+test('Phase 0 documentation limits its repository-secret finding to repository scope', () => {
+    assert.match(phaseZeroDocumentationSource, /does not establish the absence of organization-level or environment-level\s+secrets/i)
+})
+
 test('Phase 0 documentation records Flowise default-open execution and export-import as authorization boundaries', () => {
     assert.match(phaseZeroDocumentationSource, /default-open execution/i)
     assert.match(phaseZeroDocumentationSource, /\/api\/v1\/export-import/)
