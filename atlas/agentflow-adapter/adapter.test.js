@@ -108,6 +108,19 @@ function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlo
     }
 }
 
+function assertDockerIgnoreExcludesAtlasDirectory(source) {
+    const patterns = source
+        .split(String.fromCharCode(10))
+        .map((line) => line.trim())
+        .filter(Boolean)
+
+    assert.ok(patterns.includes('atlas/'), 'The root Docker build must exclude atlas/.')
+
+    for (const pattern of patterns.filter((line) => line.startsWith('!'))) {
+        assert.doesNotMatch(pattern.slice(1), /(?:^|\/|\*\*)atlas(?:\/|\*|$)/i, 'Docker ignore rules must not re-include atlas/.')
+    }
+}
+
 function assertFlowiseBuildGraphDoesNotReferenceAdapter(
     sources = [
         ['pnpm-workspace.yaml', pnpmWorkspaceSource],
@@ -386,11 +399,11 @@ test('no-I/O boundary check rejects module require capability loading', () => {
     assert.match("module.require('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
 
-test('adapter boundary workflow is a push-only, read-only credential-free contract', () => {
+test('adapter boundary workflow is push-only, read-only, and has no configured secret references', () => {
     assert.match(adapterWorkflowSource, /^on:\n\s{4}push:$/m)
     assert.doesNotMatch(adapterWorkflowSource, /^\s{4}pull_request(?:_target)?:/m)
     assert.match(adapterWorkflowSource, /^permissions:\n\s{4}contents: read$/m)
-    assert.doesNotMatch(adapterWorkflowSource, /secrets\./)
+    assert.doesNotMatch(adapterWorkflowSource, /\bsecrets\b/i)
     assert.match(adapterWorkflowSource, /persist-credentials: false/)
     assert.match(adapterWorkflowSource, /actions\/checkout@[0-9a-f]{40}/)
     assert.match(adapterWorkflowSource, /actions\/setup-node@[0-9a-f]{40}/)
@@ -428,8 +441,12 @@ test('Phase 0 documentation defers tenancy, erasure, resource, and queue contain
 })
 
 test('root container build context excludes the non-production adapter', () => {
-    assert.match(dockerIgnoreSource, /^atlas\/$/m)
-    assert.doesNotMatch(dockerIgnoreSource, /^!atlas(?:\/|$)/m)
+    assertDockerIgnoreExcludesAtlasDirectory(dockerIgnoreSource)
+})
+
+test('root container build exclusion rejects globbed atlas re-includes', () => {
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!**/atlas/**\n'), /must not re-include atlas/i)
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!atlas*\n'), /must not re-include atlas/i)
 })
 
 test('Flowise runtime sources do not import, require, or reference the non-production adapter', () => {
