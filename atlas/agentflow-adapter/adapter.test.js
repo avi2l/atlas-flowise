@@ -55,7 +55,7 @@ const flowiseRuntimeFiles = [path.join(__dirname, '../../Dockerfile')]
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno)\b|\b(?:eval|Function|fetch)\b|\bmodule(?:\.constructor\._load\b|\s*\[)|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno)\b|\b(?:eval|Function|fetch)\b|\bmodule(?:\.constructor(?:\._load\b|\s*\[)|\s*\[)|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -208,6 +208,21 @@ test('Phase 0 documentation defers permissive Flowise browser controls to privat
 test('Phase 0 documentation records the queue administration exposure and ingress normalization gate', () => {
     assert.match(phaseZeroDocumentationSource, /\/admin\/queues/)
     assert.match(phaseZeroDocumentationSource, /normalize or reject traversal and encoded path forms/i)
+})
+
+test('Phase 0 documentation records Flowise default-open execution and export-import as authorization boundaries', () => {
+    assert.match(phaseZeroDocumentationSource, /default-open execution/i)
+    assert.match(phaseZeroDocumentationSource, /\/api\/v1\/export-import/)
+})
+
+test('Phase 0 documentation defers the Flowise end-user embed surface to Atlas-owned UX', () => {
+    assert.match(phaseZeroDocumentationSource, /Flowise embed/i)
+    assert.match(phaseZeroDocumentationSource, /Atlas-owned end-user experience/i)
+})
+
+test('Phase 0 documentation accurately scopes inherited Flowise pull-request triggers', () => {
+    assert.match(phaseZeroDocumentationSource, /pull requests against any base branch/i)
+    assert.match(atlasUpstreamSource, /pull requests against any base branch/i)
 })
 
 test('adapter README identifies adapter.js as the limited static-tripwire scope', () => {
@@ -363,6 +378,10 @@ test('no-I/O boundary check rejects computed CommonJS runtime loading', () => {
     assert.match("module['constructor']['_load']('node:' + 'fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
 
+test('no-I/O boundary check rejects a computed CommonJS loader after direct constructor access', () => {
+    assert.match("module.constructor['_load']('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
+})
+
 test('no-I/O boundary check rejects module require capability loading', () => {
     assert.match("module.require('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
@@ -382,9 +401,9 @@ test('Phase 0 documentation warns that opening a PR remains gated', () => {
     assert.match(phaseZeroDocumentationSource, /Do not open a Phase-0\s+PR/i)
 })
 
-test('Phase 0 documentation records inherited Flowise CI triggers for both pull requests and main pushes', () => {
-    assert.match(phaseZeroDocumentationSource, /pull requests and pushes to `main`/i)
-    assert.match(atlasUpstreamSource, /pull requests and pushes to `main`/i)
+test('Phase 0 documentation records inherited Flowise CI triggers for pull requests against any base and main pushes', () => {
+    assert.match(phaseZeroDocumentationSource, /pull requests against any base branch and pushes to `main`/i)
+    assert.match(atlasUpstreamSource, /pull requests against any base branch and pushes to `main`/i)
 })
 
 test('Phase 0 documentation accurately describes the separate Dockerfile build context', () => {
