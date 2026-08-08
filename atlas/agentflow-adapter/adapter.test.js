@@ -245,6 +245,11 @@ test('Phase 0 documentation records Flowise default-open execution and export-im
     assert.match(phaseZeroDocumentationSource, /\/api\/v1\/export-import/)
 })
 
+test('Phase 0 documentation names unauthenticated lead reads and vector-upsert as ingress risks', () => {
+    assert.match(phaseZeroDocumentationSource, /unauthenticated[\s\S]*lead[\s\S]*read[\s\S]*PII/i)
+    assert.match(phaseZeroDocumentationSource, /unauthenticated[\s\S]*vector[\s\S]*upsert[\s\S]*prompt-injection/i)
+})
+
 test('Phase 0 documentation defers the Flowise end-user embed surface to Atlas-owned UX', () => {
     assert.match(phaseZeroDocumentationSource, /Flowise embed/i)
     assert.match(phaseZeroDocumentationSource, /Atlas-owned end-user experience/i)

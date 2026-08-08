@@ -86,11 +86,14 @@ future Atlas ingress:
 /api/v1/metrics                         /api/v1/nvidia-nim
 ```
 
-In particular, this includes vector-store write (`vector/upsert`) and file
-egress (`get-upload-file` and `openai-assistants-file/download`) paths. Entries
-without a trailing slash are still prefixes, not exact-route matches. Any future
-private ingress must deny public access and make an explicit, version-specific
-decision for every path; this record does not authorize any of them.
+In particular, this includes unauthenticated vector-store write
+(`vector/upsert`), which is a prompt-injection ingress risk when a flow later
+retrieves that store; file egress (`get-upload-file` and
+`openai-assistants-file/download`); and unauthenticated lead reads that can
+return captured PII (`leads`). Entries without a trailing slash are still
+prefixes, not exact-route matches. Any future private ingress must deny public
+access and make an explicit, version-specific decision for every path; this
+record does not authorize any of them.
 
 ## Execution, instance-export, and end-user UX boundaries
 
