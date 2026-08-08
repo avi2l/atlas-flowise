@@ -65,6 +65,9 @@ Isolated pinned Flowise 2.2.7 runtime
    loading behavior. Its source-level static tripwire and closed directory
    allow-list are regression guards, not an adversarial-edit control or a
    complete proof against indirect JavaScript runtime capabilities.
+8. Flowise persistent state, uploads, and backups are separate contained data
+   paths. They must not be co-located with or share credentials with any Atlas
+   datastore.
 
 ## Unauthenticated-prefix reconnaissance
 
@@ -247,6 +250,15 @@ Do **not** implement a transport until Atlas approves all of the following:
 14. Operator access and flow-definition change control: who can access the
     Flowise canvas or its administrative APIs, how workflow changes are approved
     and audited, and how that control preserves tenant/trust-domain isolation.
+15. Flowise persistent-state placement and ownership: the database, upload/file
+    storage, backups, encryption at rest, access paths, and credentials must be
+    separately owned and contained. They must not be co-located with or share
+    credentials with any Atlas datastore.
+16. The Atlas end-user output contract: Flowise-produced artifacts require an
+    isolated or sandboxed serving origin, or forced download with explicit
+    content type and disposition. Model-authored content and links require an
+    allow-listed rendering policy, and there must be no verbatim relay of
+    Flowise errors to end users.
 
 These are architecture decisions with security impact. Their absence is why
 this Phase-0 adapter stays disabled. The inherited repository-dispatch and

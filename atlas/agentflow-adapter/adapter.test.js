@@ -462,6 +462,12 @@ test('Phase 0 documentation defers tenancy, erasure, resource, and queue contain
     assert.match(phaseZeroDocumentationSource, /queue mode/i)
 })
 
+test('Phase 0 documentation defers persistent-state placement and end-user output rendering decisions', () => {
+    assert.match(phaseZeroDocumentationSource, /must not be co-located with or share credentials with any Atlas\s+datastore/i)
+    assert.match(phaseZeroDocumentationSource, /end-user output contract/i)
+    assert.match(phaseZeroDocumentationSource, /no verbatim relay of\s+Flowise errors/i)
+})
+
 test('root container build context excludes the non-production adapter', () => {
     assertDockerIgnoreExcludesAtlasDirectory(dockerIgnoreSource)
 })
