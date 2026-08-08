@@ -436,6 +436,10 @@ test('Phase 0 documentation gates inherited CI for un-slashed PR bases and main 
     assert.match(phaseZeroDocumentationSource, /do not target an un-slashed branch or merge this branch to `main`/i)
 })
 
+test('Phase 0 documentation permits review only against the slash-containing pinned baseline', () => {
+    assert.match(phaseZeroDocumentationSource, /review only against the\s+slash-containing pinned baseline/i)
+})
+
 test('Phase 0 documentation records inherited Flowise CI triggers for slash-free PR bases and main pushes', () => {
     assert.match(phaseZeroDocumentationSource, /pull requests only when the base branch name contains no slash/i)
     assert.match(atlasUpstreamSource, /pull requests only when the base branch name contains no slash/i)
