@@ -146,7 +146,7 @@ function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlo
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(
             source,
-            /agentflow-adapter\b|\b(?:require|import)\s*(?:\(\s*)?["'`](?:[^"'`]*[\\/])?atlas(?:[\\/]|["'`])|\bfrom\s*["'`](?:[^"'`]*[\\/])?atlas(?:[\\/]|["'`])/i,
+            /agentflow-adapter\b|@atlas[\\/]|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|(?:^|[\s"'`])atlas[\\/]/im,
             name
         )
     }
@@ -177,7 +177,7 @@ function assertFlowiseBuildGraphDoesNotReferenceAdapter(
     ]
 ) {
     for (const [name, source] of sources) {
-        assert.doesNotMatch(source, /(?:^|[\s"'`])(?:\.\/)?atlas(?:[\\/]|-agentflow-adapter\b|["'\s]|$)/im, name)
+        assert.doesNotMatch(source, /@atlas[\\/]|(?:^|[\s"'`])(?:\.{1,2}[\\/])*atlas(?:[\\/]|-agentflow-adapter\b|["'\s]|$)/im, name)
     }
 }
 
@@ -597,6 +597,20 @@ test('Flowise runtime sources cannot reference a bare or case-varied Atlas entry
     )
 })
 
+test('Flowise runtime sources cannot copy the Atlas directory outside the adapter workflow', () => {
+    assert.throws(
+        () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'Dockerfile', source: 'COPY atlas/ /usr/src/atlas/' }]),
+        /Dockerfile/
+    )
+})
+
+test('Flowise runtime sources cannot import a scoped Atlas package', () => {
+    assert.throws(
+        () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source: "require('@atlas/bridge')" }]),
+        /runtime.js/
+    )
+})
+
 test('Flowise containment scan includes all GitHub control sources, not only workflow files', () => {
     assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}.github`)))
 })
@@ -617,6 +631,13 @@ test('Flowise build-graph guard rejects a bare atlas workspace entry', () => {
     assert.throws(
         () => assertFlowiseBuildGraphDoesNotReferenceAdapter([['pnpm-workspace.yaml', "packages:\n  - 'atlas'"]]),
         /pnpm-workspace.yaml/
+    )
+})
+
+test('Flowise build-graph guard rejects a scoped Atlas workspace dependency', () => {
+    assert.throws(
+        () => assertFlowiseBuildGraphDoesNotReferenceAdapter([['package.json', '{"dependencies":{"@atlas/bridge":"workspace:*"}}']]),
+        /package.json/
     )
 })
 
