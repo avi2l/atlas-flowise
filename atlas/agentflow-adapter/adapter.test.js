@@ -122,7 +122,8 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
         const extension = path.extname(entry.name)
         const entryParent = path.relative(rootDirectory, path.dirname(entryPath))
         const isBinEntryScript = entryParent === 'bin' && (extension === '' || extension === '.cmd')
-        const isHuskyHook = entryParent === '.husky' && extension === ''
+        const isHuskyHook =
+            (entryParent === '.husky' || (path.basename(rootDirectory) === '.husky' && entryParent === '')) && extension === ''
 
         if (entry.isDirectory() && !flowiseRuntimeIgnoredDirectories.includes(entry.name)) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
@@ -380,6 +381,25 @@ test('runtime source collection includes extensionless commit hooks for adapter-
                 .map(({ name }) => name)
                 .sort(),
             ['.husky/pre-commit']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes extensionless commit hooks when the Husky directory is the scan root', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+    const huskyDirectory = path.join(fixtureDirectory, '.husky')
+
+    try {
+        fs.mkdirSync(huskyDirectory)
+        fs.writeFileSync(path.join(huskyDirectory, 'pre-commit'), '#!/usr/bin/env sh\nnode atlas/agentflow-adapter/adapter.js\n')
+
+        assert.deepEqual(
+            collectRuntimeSources(huskyDirectory, huskyDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['pre-commit']
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
