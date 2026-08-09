@@ -93,16 +93,53 @@ const flowiseRuntimeFiles = [
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\.\s*constructor\b|\[\s*["'`]constructor["'`]\s*\]|\bconstructor\s*:|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\.\s*constructor\b|\[\s*["'`]constructor["'`]\s*\]|\[\s*["'`]con["'`]\s*\+\s*["'`]structor["'`]\s*\]|\bconstructor\s*:|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
+const expectedAdapterSource = [
+    "'use strict'",
+    '',
+    "const DISABLED_CODE = 'ATLAS_AGENTFLOW_ADAPTER_DISABLED'",
+    'const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object.freeze([])',
+    '',
+    'class NonProductionAdapterError extends Error {',
+    '    constructor(operation) {',
+    "        super('The Atlas AgentFlow adapter is a non-production boundary skeleton and is disabled.')",
+    "        this.name = 'NonProductionAdapterError'",
+    '        this.code = DISABLED_CODE',
+    '        this.operation = operation',
+    '    }',
+    '}',
+    '',
+    'function createNonProductionAdapter() {',
+    '    const rejectDisabled = (operation) => async () => {',
+    '        throw new NonProductionAdapterError(operation)',
+    '    }',
+    '',
+    '    return Object.freeze({',
+    '        enabled: false,',
+    "        run: rejectDisabled('run'),",
+    "        abort: rejectDisabled('abort')",
+    '    })',
+    '}',
+    '',
+    'module.exports = {',
+    '    createNonProductionAdapter,',
+    '    NonProductionAdapterError,',
+    '    NON_PRODUCTION_ADAPTER_DEPENDENCIES',
+    '}',
+    ''
+].join('\n')
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
 
     for (const { source } of adapterSources) {
+        assert.equal(
+            source.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)),
+            expectedAdapterSource,
+            'Adapter source must remain the sealed Phase 0 skeleton.'
+        )
         assert.doesNotMatch(source, prohibitedRuntimeAccess)
     }
-
-    assert.match(adapterSources[0].source, /const NON_PRODUCTION_ADAPTER_DEPENDENCIES = Object\.freeze\(\[\]\)/)
 }
 
 function assertAdapterWorkflowIsContained(source) {
@@ -537,6 +574,13 @@ test('no-I/O boundary check rejects a single function constructor escape', () =>
 
 test('no-I/O boundary check rejects a computed function constructor escape', () => {
     assert.match("const F = (() => {})['constructor']['constructor']; F('return pro' + 'cess')()", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects synthesized function constructor property names', () => {
+    assert.match(
+        "Object.getPrototypeOf(async () => {})['con' + 'structor'](\"return pro\" + \"cess.mainModule['req' + 'uire']('f' + 's')\")()",
+        prohibitedRuntimeAccess
+    )
 })
 
 test('no-I/O boundary check rejects a destructured constructor escape', () => {
