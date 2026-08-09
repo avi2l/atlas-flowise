@@ -146,7 +146,7 @@ function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlo
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(
             source,
-            /agentflow-adapter\b|@atlas[\\/]|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|(?:^|[\s"'`])atlas[\\/]/im,
+            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|(?:^|[\s"'`])atlas[\\/]|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])/im,
             name
         )
     }
@@ -609,6 +609,12 @@ test('Flowise runtime sources cannot import a scoped Atlas package', () => {
         () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source: "require('@atlas/bridge')" }]),
         /runtime.js/
     )
+})
+
+test('Flowise runtime sources cannot import Atlas through bare or absolute module paths', () => {
+    for (const source of ["require('atlas')", "require('/atlas/bridge')"]) {
+        assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source }]), /runtime.js/)
+    }
 })
 
 test('Flowise containment scan includes all GitHub control sources, not only workflow files', () => {
