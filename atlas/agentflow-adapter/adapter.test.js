@@ -144,7 +144,11 @@ function collectFlowiseRuntimeSources() {
 
 function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
     for (const { name, source } of runtimeSources) {
-        assert.doesNotMatch(source, /agentflow-adapter\b|(?:require\s*\(\s*|from\s+)["'](?:[^"']*[\\/])?atlas(?:[\\/]|["'])/i, name)
+        assert.doesNotMatch(
+            source,
+            /agentflow-adapter\b|\b(?:require|import)\s*(?:\(\s*)?["'`](?:[^"'`]*[\\/])?atlas(?:[\\/]|["'`])|\bfrom\s*["'`](?:[^"'`]*[\\/])?atlas(?:[\\/]|["'`])/i,
+            name
+        )
     }
 }
 
@@ -569,6 +573,17 @@ test('Flowise runtime sources cannot import a future Atlas sibling module', () =
         () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source: "require('../../atlas/bridge')" }]),
         /runtime.js/
     )
+})
+
+test('Flowise runtime sources cannot dynamically or side-effect import a future Atlas sibling module', () => {
+    for (const source of [
+        "import('../../atlas/bridge')",
+        "import '../../atlas/bridge'",
+        'import(`../../atlas/bridge`)',
+        'require(`../../atlas/bridge`)'
+    ]) {
+        assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source }]), /runtime.js/)
+    }
 })
 
 test('Flowise runtime sources cannot reference a bare or case-varied Atlas entry point', () => {
