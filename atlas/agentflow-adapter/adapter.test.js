@@ -49,6 +49,7 @@ const flowiseRuntimeDirectories = [
     path.join(__dirname, '../../packages'),
     path.join(__dirname, '../../docker'),
     path.join(__dirname, '../../.github'),
+    path.join(__dirname, '../../.husky'),
     path.join(__dirname, '../../metrics')
 ]
 const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
@@ -92,7 +93,7 @@ const flowiseRuntimeFiles = [
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\.\s*constructor\b|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\.\s*constructor\b|\[\s*["'`]constructor["'`]\s*\]|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -151,7 +152,7 @@ function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlo
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(
             source,
-            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|(?:^|[\s"'`])atlas[\\/]|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])/im,
+            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|(?:^|[\s"'`])atlas[\\/]|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)/im,
             name
         )
     }
@@ -491,6 +492,10 @@ test('no-I/O boundary check rejects a single function constructor escape', () =>
     assert.match("(() => {}).constructor('return pro' + 'cess')()", prohibitedRuntimeAccess)
 })
 
+test('no-I/O boundary check rejects a computed function constructor escape', () => {
+    assert.match("const F = (() => {})['constructor']['constructor']; F('return pro' + 'cess')()", prohibitedRuntimeAccess)
+})
+
 test('no-I/O boundary check rejects indirect CommonJS runtime loading', () => {
     assert.match("module.constructor._load('node:fs').readFileSync('sensitive-file')", prohibitedRuntimeAccess)
 })
@@ -628,10 +633,9 @@ test('Flowise runtime sources cannot reference a bare or case-varied Atlas entry
 })
 
 test('Flowise runtime sources cannot copy the Atlas directory outside the adapter workflow', () => {
-    assert.throws(
-        () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'Dockerfile', source: 'COPY atlas/ /usr/src/atlas/' }]),
-        /Dockerfile/
-    )
+    for (const source of ['COPY atlas/ /usr/src/atlas/', 'COPY atlas /usr/src/atlas', 'COPY ./atlas /app', 'RUN cp -r atlas dist']) {
+        assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'Dockerfile', source }]), /Dockerfile/)
+    }
 })
 
 test('Flowise runtime sources cannot import a scoped Atlas package', () => {
@@ -653,6 +657,10 @@ test('Flowise containment scan includes all GitHub control sources, not only wor
 
 test('Flowise containment scan includes metrics deployment sources', () => {
     assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}metrics`)))
+})
+
+test('Flowise containment scan includes commit-hook control sources', () => {
+    assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}.husky`)))
 })
 
 test('Flowise containment scan includes explicit root runtime and control surfaces', () => {
