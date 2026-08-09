@@ -56,6 +56,9 @@ const expectedAdapterWorkflowSource = [
     '',
     'on:',
     '    push:',
+    '    pull_request:',
+    '        branches:',
+    '            - atlas/pinned-flowise-2.2.7',
     '',
     'permissions:',
     '    contents: read',
@@ -484,8 +487,8 @@ test('Phase 0 documentation gates inherited CI for un-slashed PR bases and main 
     assert.match(phaseZeroDocumentationSource, /do not target an un-slashed branch or merge this branch to `main`/i)
 })
 
-test('Phase 0 documentation permits review only against the slash-containing pinned baseline', () => {
-    assert.match(phaseZeroDocumentationSource, /review only against the\s+slash-containing pinned baseline/i)
+test('Phase 0 documentation permits adapter contract pull requests only against the pinned baseline', () => {
+    assert.match(phaseZeroDocumentationSource, /pull requests whose base is only\s+the slash-containing pinned baseline/i)
 })
 
 test('Phase 0 documentation records inherited Flowise CI triggers for slash-free PR bases and main pushes', () => {
