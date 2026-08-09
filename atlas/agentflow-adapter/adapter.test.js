@@ -48,7 +48,8 @@ const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerig
 const flowiseRuntimeDirectories = [
     path.join(__dirname, '../../packages'),
     path.join(__dirname, '../../docker'),
-    path.join(__dirname, '../../.github')
+    path.join(__dirname, '../../.github'),
+    path.join(__dirname, '../../metrics')
 ]
 const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
 const expectedAdapterWorkflowSource = [
@@ -91,7 +92,7 @@ const flowiseRuntimeFiles = [
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\bconstructor\s*\.\s*constructor\b|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\.\s*constructor\b|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -117,9 +118,13 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
 
         assertSupportedDirectoryEntry(entry, entryPath)
 
+        const extension = path.extname(entry.name)
+        const isBinEntryScript =
+            path.relative(rootDirectory, path.dirname(entryPath)) === 'bin' && (extension === '' || extension === '.cmd')
+
         if (entry.isDirectory() && !flowiseRuntimeIgnoredDirectories.includes(entry.name)) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
-        } else if (entry.isFile() && (entry.name === 'Dockerfile' || runtimeSourceExtensions.has(path.extname(entry.name)))) {
+        } else if (entry.isFile() && (entry.name === 'Dockerfile' || runtimeSourceExtensions.has(extension) || isBinEntryScript)) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
                 source: fs.readFileSync(entryPath, 'utf8')
@@ -336,6 +341,27 @@ test('runtime source collection reads only explicit source file types', () => {
     }
 })
 
+test('runtime source collection includes extensionless and Windows bin entry scripts for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const binDirectory = path.join(fixtureDirectory, 'bin')
+        fs.mkdirSync(binDirectory)
+        fs.writeFileSync(path.join(binDirectory, 'run'), "#!/usr/bin/env node\nrequire('../../atlas/agentflow-adapter/adapter')\n")
+        fs.writeFileSync(path.join(binDirectory, 'run.cmd'), '@echo off\n')
+        fs.writeFileSync(path.join(fixtureDirectory, 'README'), 'must-not-be-read\n')
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['bin/run', 'bin/run.cmd']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
 test('runtime source collection includes Dockerfiles for adapter-reference scanning', () => {
     const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
 
@@ -459,6 +485,10 @@ test('no-I/O boundary check rejects browser and alternate-runtime network or env
 test('no-I/O boundary check rejects dynamic code evaluation', () => {
     assert.match("eval('arbitrary code')", prohibitedRuntimeAccess)
     assert.match("new Function('return arbitraryValue')", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects a single function constructor escape', () => {
+    assert.match("(() => {}).constructor('return pro' + 'cess')()", prohibitedRuntimeAccess)
 })
 
 test('no-I/O boundary check rejects indirect CommonJS runtime loading', () => {
@@ -619,6 +649,10 @@ test('Flowise runtime sources cannot import Atlas through bare or absolute modul
 
 test('Flowise containment scan includes all GitHub control sources, not only workflow files', () => {
     assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}.github`)))
+})
+
+test('Flowise containment scan includes metrics deployment sources', () => {
+    assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}metrics`)))
 })
 
 test('Flowise containment scan includes explicit root runtime and control surfaces', () => {
