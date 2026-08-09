@@ -45,13 +45,8 @@ const rootPackageSource = fs.readFileSync(path.join(__dirname, '../../package.js
 const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
-const flowiseRuntimeDirectories = [
-    path.join(__dirname, '../../packages'),
-    path.join(__dirname, '../../docker'),
-    path.join(__dirname, '../../.github'),
-    path.join(__dirname, '../../.husky'),
-    path.join(__dirname, '../../metrics')
-]
+const flowiseRuntimeRootDirectory = path.join(__dirname, '../..')
+const flowiseRuntimeIgnoredDirectories = ['.git', '.turbo', 'atlas', 'build', 'dist', 'docs', 'node_modules']
 const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
 const expectedAdapterWorkflowSource = [
     'name: Atlas AgentFlow Adapter Boundary',
@@ -81,16 +76,6 @@ const expectedAdapterWorkflowSource = [
     '                  node-version: 20',
     '            - run: node --test atlas/agentflow-adapter/adapter.test.js'
 ].join('\n')
-const flowiseRuntimeFiles = [
-    path.join(__dirname, '../../Dockerfile'),
-    path.join(__dirname, '../../.eslintrc.js'),
-    path.join(__dirname, '../../.npmrc'),
-    path.join(__dirname, '../../artillery-load-test.yml'),
-    path.join(__dirname, '../../package.json'),
-    path.join(__dirname, '../../pnpm-workspace.yaml'),
-    path.join(__dirname, '../../turbo.json')
-]
-const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
     /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\.\s*constructor\b|\[\s*["'`]constructor["'`]\s*\]|\[\s*["'`]con["'`]\s*\+\s*["'`]structor["'`]\s*\]|\bconstructor\s*:|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
@@ -146,7 +131,24 @@ function assertAdapterWorkflowIsContained(source) {
     assert.equal(source.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)).trim(), expectedAdapterWorkflowSource)
 }
 
-const runtimeSourceExtensions = new Set(['.cjs', '.js', '.json', '.jsx', '.mjs', '.sh', '.ts', '.tsx', '.yaml', '.yml'])
+const runtimeSourceExtensions = new Set([
+    '.bat',
+    '.cjs',
+    '.cmd',
+    '.html',
+    '.js',
+    '.json',
+    '.jsx',
+    '.mjs',
+    '.ps1',
+    '.sh',
+    '.toml',
+    '.ts',
+    '.tsx',
+    '.vue',
+    '.yaml',
+    '.yml'
+])
 
 function collectRuntimeSources(directory, rootDirectory = directory) {
     const sourceFiles = []
@@ -178,16 +180,10 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
     return sourceFiles
 }
 
-function collectFlowiseRuntimeSources() {
-    return flowiseRuntimeDirectories
-        .flatMap((directory) => collectRuntimeSources(directory, directory))
-        .filter(({ name }) => name !== `workflows/${atlasAdapterWorkflowName}`)
-        .concat(
-            flowiseRuntimeFiles.map((filePath) => ({
-                name: path.basename(filePath),
-                source: fs.readFileSync(filePath, 'utf8')
-            }))
-        )
+function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirectory) {
+    return collectRuntimeSources(rootDirectory, rootDirectory).filter(
+        ({ name }) => name !== `.github/workflows/${atlasAdapterWorkflowName}`
+    )
 }
 
 function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
@@ -362,6 +358,23 @@ test('adapter README identifies adapter.js as the limited static-tripwire scope'
 
 test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
     assertAdapterSourcesAreSafe()
+})
+
+test('runtime source collection includes PowerShell scripts for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        fs.writeFileSync(path.join(fixtureDirectory, 'deploy.ps1'), 'Copy-Item atlas/agentflow-adapter destination\n')
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['deploy.ps1']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
 })
 
 test('runtime source collection reads only explicit source file types', () => {
@@ -673,6 +686,11 @@ test('Phase 0 documentation defers persistent-state placement and end-user outpu
     assert.match(phaseZeroDocumentationSource, /no verbatim relay of\s+Flowise errors/i)
 })
 
+test('Phase 0 documentation defers runtime operations and failure semantics', () => {
+    assert.match(phaseZeroDocumentationSource, /monitoring, alerting, incident response, and\s+on-call ownership/i)
+    assert.match(phaseZeroDocumentationSource, /outage behavior,\s+idempotency, and duplicate-execution handling/i)
+})
+
 test('root container build context excludes the non-production adapter', () => {
     assertDockerIgnoreExcludesAtlasDirectory(dockerIgnoreSource)
 })
@@ -681,6 +699,23 @@ test('root container build exclusion rejects globbed atlas re-includes', () => {
     assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!**/atlas/**\n'), /must not re-include atlas/i)
     assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!atlas*\n'), /must not re-include atlas/i)
     assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!**/agentflow-adapter/**\n'), /must not re-include atlas/i)
+})
+
+test('Flowise containment discovery scans new top-level runtime directories', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+    const runtimeDirectory = path.join(fixtureDirectory, 'new-runtime')
+
+    try {
+        fs.mkdirSync(runtimeDirectory)
+        fs.writeFileSync(path.join(runtimeDirectory, 'deploy.ps1'), 'Copy-Item atlas/agentflow-adapter destination\n')
+
+        assert.ok(
+            collectFlowiseRuntimeSources(fixtureDirectory).some(({ name }) => name === 'new-runtime/deploy.ps1'),
+            'New top-level runtime directories must be included in containment scanning.'
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
 })
 
 test('Flowise runtime sources do not import, require, or reference the non-production adapter', () => {
@@ -758,28 +793,12 @@ test('Flowise runtime sources cannot import Atlas through bare or absolute modul
     }
 })
 
-test('Flowise containment scan includes all GitHub control sources, not only workflow files', () => {
-    assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}.github`)))
-})
+test('Flowise containment scan includes established runtime and control surfaces', () => {
+    const sourceNames = new Set(collectFlowiseRuntimeSources().map(({ name }) => name))
 
-test('Flowise containment scan includes metrics deployment sources', () => {
-    assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}metrics`)))
-})
-
-test('Flowise containment scan includes commit-hook control sources', () => {
-    assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}.husky`)))
-})
-
-test('Flowise containment scan includes explicit root runtime and control surfaces', () => {
-    assert.deepEqual(flowiseRuntimeFiles.map((file) => path.basename(file)).sort(), [
-        '.eslintrc.js',
-        '.npmrc',
-        'Dockerfile',
-        'artillery-load-test.yml',
-        'package.json',
-        'pnpm-workspace.yaml',
-        'turbo.json'
-    ])
+    for (const sourceName of ['.github/workflows/main.yml', '.husky/pre-commit', 'Dockerfile', 'metrics/otel/compose.yaml']) {
+        assert.ok(sourceNames.has(sourceName), `${sourceName} must be included in containment scanning.`)
+    }
 })
 
 test('Flowise build-graph guard rejects a bare atlas workspace entry', () => {

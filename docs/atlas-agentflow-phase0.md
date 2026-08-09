@@ -259,6 +259,10 @@ Do **not** implement a transport until Atlas approves all of the following:
     content type and disposition. Model-authored content and links require an
     allow-listed rendering policy, and there must be no verbatim relay of
     Flowise errors to end users.
+17. Runtime operational ownership: monitoring, alerting, incident response, and
+    on-call ownership for the contained Flowise dependency and its ingress must
+    be assigned. The Atlas boundary must also define outage behavior,
+    idempotency, and duplicate-execution handling before it submits a run.
 
 These are architecture decisions with security impact. Their absence is why
 this Phase-0 adapter stays disabled. The inherited repository-dispatch and
