@@ -93,7 +93,7 @@ const flowiseRuntimeFiles = [
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
-    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\.\s*constructor\b|\[\s*["'`]constructor["'`]\s*\]|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
+    /\b(?:require|import|process|global|globalThis|console|WebSocket|EventSource|XMLHttpRequest|navigator|Bun|Deno|Reflect|arguments|__filename|__dirname)\b|\.\s*constructor\b|\[\s*["'`]constructor["'`]\s*\]|\bconstructor\s*:|\b(?:eval|Function|fetch)\b|\bmodule(?!\.exports\b)|\b(?:fs|http|https|net|tls|child_process)\s*\./
 
 function assertAdapterSourcesAreSafe() {
     assert.deepEqual(adapterDirectoryEntries.map(({ name }) => name).sort(), ['README.md', 'adapter.js', 'adapter.test.js'])
@@ -120,12 +120,16 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
         assertSupportedDirectoryEntry(entry, entryPath)
 
         const extension = path.extname(entry.name)
-        const isBinEntryScript =
-            path.relative(rootDirectory, path.dirname(entryPath)) === 'bin' && (extension === '' || extension === '.cmd')
+        const entryParent = path.relative(rootDirectory, path.dirname(entryPath))
+        const isBinEntryScript = entryParent === 'bin' && (extension === '' || extension === '.cmd')
+        const isHuskyHook = entryParent === '.husky' && extension === ''
 
         if (entry.isDirectory() && !flowiseRuntimeIgnoredDirectories.includes(entry.name)) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
-        } else if (entry.isFile() && (entry.name === 'Dockerfile' || runtimeSourceExtensions.has(extension) || isBinEntryScript)) {
+        } else if (
+            entry.isFile() &&
+            (entry.name === 'Dockerfile' || runtimeSourceExtensions.has(extension) || isBinEntryScript || isHuskyHook)
+        ) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
                 source: fs.readFileSync(entryPath, 'utf8')
@@ -363,6 +367,25 @@ test('runtime source collection includes extensionless and Windows bin entry scr
     }
 })
 
+test('runtime source collection includes extensionless commit hooks for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const huskyDirectory = path.join(fixtureDirectory, '.husky')
+        fs.mkdirSync(huskyDirectory)
+        fs.writeFileSync(path.join(huskyDirectory, 'pre-commit'), '#!/usr/bin/env sh\nnode atlas/agentflow-adapter/adapter.js\n')
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['.husky/pre-commit']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
 test('runtime source collection includes Dockerfiles for adapter-reference scanning', () => {
     const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
 
@@ -494,6 +517,13 @@ test('no-I/O boundary check rejects a single function constructor escape', () =>
 
 test('no-I/O boundary check rejects a computed function constructor escape', () => {
     assert.match("const F = (() => {})['constructor']['constructor']; F('return pro' + 'cess')()", prohibitedRuntimeAccess)
+})
+
+test('no-I/O boundary check rejects a destructured constructor escape', () => {
+    assert.match(
+        "const { constructor: F } = Object.getPrototypeOf(async function () {}); F('return pro' + 'cess')().env",
+        prohibitedRuntimeAccess
+    )
 })
 
 test('no-I/O boundary check rejects indirect CommonJS runtime loading', () => {
