@@ -2,6 +2,9 @@ name: Atlas AgentFlow Adapter Boundary
 
 on:
     push:
+    pull_request:
+        branches:
+            - atlas/pinned-flowise-2.2.7
 
 permissions:
     contents: read
