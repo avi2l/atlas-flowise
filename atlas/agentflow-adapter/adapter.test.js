@@ -152,7 +152,7 @@ function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlo
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(
             source,
-            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|(?:^|[\s"'`])atlas[\\/]|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)/im,
+            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|(?:^|[\s"'`])atlas[\\/]|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im,
             name
         )
     }
@@ -633,9 +633,22 @@ test('Flowise runtime sources cannot reference a bare or case-varied Atlas entry
 })
 
 test('Flowise runtime sources cannot copy the Atlas directory outside the adapter workflow', () => {
-    for (const source of ['COPY atlas/ /usr/src/atlas/', 'COPY atlas /usr/src/atlas', 'COPY ./atlas /app', 'RUN cp -r atlas dist']) {
+    for (const source of [
+        'COPY atlas/ /usr/src/atlas/',
+        'COPY atlas /usr/src/atlas',
+        'COPY ./atlas /app',
+        'COPY ["atlas", "/app"]',
+        'RUN cp -r atlas dist'
+    ]) {
         assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'Dockerfile', source }]), /Dockerfile/)
     }
+})
+
+test('Flowise workflow sources cannot set the Atlas directory as a working directory', () => {
+    assert.throws(
+        () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'workflow.yml', source: 'working-directory: atlas' }]),
+        /workflow.yml/
+    )
 })
 
 test('Flowise runtime sources cannot import a scoped Atlas package', () => {
