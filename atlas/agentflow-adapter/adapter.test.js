@@ -79,7 +79,15 @@ const expectedAdapterWorkflowSource = [
     '                  node-version: 20',
     '            - run: node --test atlas/agentflow-adapter/adapter.test.js'
 ].join('\n')
-const flowiseRuntimeFiles = [path.join(__dirname, '../../Dockerfile')]
+const flowiseRuntimeFiles = [
+    path.join(__dirname, '../../Dockerfile'),
+    path.join(__dirname, '../../.eslintrc.js'),
+    path.join(__dirname, '../../.npmrc'),
+    path.join(__dirname, '../../artillery-load-test.yml'),
+    path.join(__dirname, '../../package.json'),
+    path.join(__dirname, '../../pnpm-workspace.yaml'),
+    path.join(__dirname, '../../turbo.json')
+]
 const flowiseRuntimeIgnoredDirectories = ['node_modules', 'dist', 'build', '.turbo']
 
 const prohibitedRuntimeAccess =
@@ -136,7 +144,7 @@ function collectFlowiseRuntimeSources() {
 
 function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
     for (const { name, source } of runtimeSources) {
-        assert.doesNotMatch(source, /(?:atlas[\\/])?agentflow-adapter|atlas[\\/]/, name)
+        assert.doesNotMatch(source, /agentflow-adapter\b|(?:require\s*\(\s*|from\s+)["'](?:[^"']*[\\/])?atlas(?:[\\/]|["'])/i, name)
     }
 }
 
@@ -149,7 +157,11 @@ function assertDockerIgnoreExcludesAtlasDirectory(source) {
     assert.ok(patterns.includes('atlas/'), 'The root Docker build must exclude atlas/.')
 
     for (const pattern of patterns.filter((line) => line.startsWith('!'))) {
-        assert.doesNotMatch(pattern.slice(1), /(?:^|\/|\*\*)atlas(?:\/|\*|$)/i, 'Docker ignore rules must not re-include atlas/.')
+        assert.doesNotMatch(
+            pattern.slice(1),
+            /(?:^|\/|\*\*)(?:atlas|agentflow-adapter)(?:\/|\*|$)/i,
+            'Docker ignore rules must not re-include atlas/.'
+        )
     }
 }
 
@@ -535,6 +547,7 @@ test('root container build context excludes the non-production adapter', () => {
 test('root container build exclusion rejects globbed atlas re-includes', () => {
     assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!**/atlas/**\n'), /must not re-include atlas/i)
     assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!atlas*\n'), /must not re-include atlas/i)
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!**/agentflow-adapter/**\n'), /must not re-include atlas/i)
 })
 
 test('Flowise runtime sources do not import, require, or reference the non-production adapter', () => {
@@ -558,8 +571,31 @@ test('Flowise runtime sources cannot import a future Atlas sibling module', () =
     )
 })
 
+test('Flowise runtime sources cannot reference a bare or case-varied Atlas entry point', () => {
+    assert.throws(
+        () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source: "require('../../atlas')" }]),
+        /runtime.js/
+    )
+    assert.throws(
+        () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source: "require('../../Atlas/bridge')" }]),
+        /runtime.js/
+    )
+})
+
 test('Flowise containment scan includes all GitHub control sources, not only workflow files', () => {
     assert.ok(flowiseRuntimeDirectories.some((directory) => directory.endsWith(`${path.sep}.github`)))
+})
+
+test('Flowise containment scan includes explicit root runtime and control surfaces', () => {
+    assert.deepEqual(flowiseRuntimeFiles.map((file) => path.basename(file)).sort(), [
+        '.eslintrc.js',
+        '.npmrc',
+        'Dockerfile',
+        'artillery-load-test.yml',
+        'package.json',
+        'pnpm-workspace.yaml',
+        'turbo.json'
+    ])
 })
 
 test('Flowise build-graph guard rejects a bare atlas workspace entry', () => {
