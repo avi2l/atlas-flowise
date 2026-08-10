@@ -385,6 +385,13 @@ test('Phase 0 documentation names unauthenticated lead reads and vector-upsert a
     assert.match(phaseZeroDocumentationSource, /unauthenticated[\s\S]*vector[\s\S]*upsert[\s\S]*prompt-injection/i)
 })
 
+test('Phase 0 documentation defers NVIDIA NIM host installer and container control risk', () => {
+    assert.match(
+        phaseZeroDocumentationSource,
+        /unauthenticated `\/api\/v1\/nvidia-nim`[\s\S]*host\s+installer and container control risk[\s\S]*containment decision is deferred/i
+    )
+})
+
 test('Phase 0 documentation defers the Flowise end-user embed surface to Atlas-owned UX', () => {
     assert.match(phaseZeroDocumentationSource, /Flowise embed/i)
     assert.match(phaseZeroDocumentationSource, /Atlas-owned end-user experience/i)

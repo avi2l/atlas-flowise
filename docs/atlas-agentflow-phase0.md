@@ -117,10 +117,16 @@ In particular, this includes unauthenticated vector-store write
 (`vector/upsert`), which is a prompt-injection ingress risk when a flow later
 retrieves that store; file egress (`get-upload-file` and
 `openai-assistants-file/download`); and unauthenticated lead reads that can
-return captured PII (`leads`). Entries without a trailing slash are still
-prefixes, not exact-route matches. Any future private ingress must deny public
-access and make an explicit, version-specific decision for every path; this
-record does not authorize any of them.
+return captured PII (`leads`). Unauthenticated `/api/v1/nvidia-nim` is a host
+installer and container control risk: its routes can download/run the NVIDIA
+installer and accept caller-controlled image tags for image pull and container
+start operations. Its token-mint route also makes an outbound NVIDIA request.
+The containment decision is deferred: Phase 0 neither enables these routes nor
+authorizes a Flowise runtime with Docker socket, host-runtime, or installer
+control. Entries without a trailing slash are still prefixes, not exact-route
+matches. Any future private ingress must deny public access and make an
+explicit, version-specific decision for every path; this record does not
+authorize any of them.
 
 ## Execution, instance-export, and end-user UX boundaries
 
