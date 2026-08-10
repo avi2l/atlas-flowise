@@ -146,6 +146,7 @@ const runtimeSourceExtensions = new Set([
     '.bat',
     '.cjs',
     '.cmd',
+    '.cts',
     '.html',
     '.js',
     '.json',
@@ -186,6 +187,8 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
         } else if (
             entry.isFile() &&
             (entry.name === 'Dockerfile' ||
+                entry.name.startsWith('Dockerfile.') ||
+                extension === '.dockerfile' ||
                 entry.name === 'Makefile' ||
                 runtimeSourceExtensions.has(extension) ||
                 isBinEntryScript ||
@@ -568,6 +571,29 @@ test('runtime source collection includes Dockerfiles for adapter-reference scann
                 .sort(),
             ['Dockerfile']
         )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes Dockerfile variants and CommonJS TypeScript for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const sourceByName = {
+            'Dockerfile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'worker.dockerfile': 'COPY atlas/agentflow-adapter /boundary\n',
+            'runtime.cts': "require('../../atlas/agentflow-adapter')\n"
+        }
+
+        for (const [name, source] of Object.entries(sourceByName)) {
+            fs.writeFileSync(path.join(fixtureDirectory, name), source)
+        }
+
+        const runtimeSources = collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+
+        assert.deepEqual(runtimeSources.map(({ name }) => name).sort(), Object.keys(sourceByName).sort())
+        assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources))
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
     }
