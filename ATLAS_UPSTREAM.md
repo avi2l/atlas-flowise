@@ -80,7 +80,10 @@ production data into this repository.
 
 This repository is based on the Apache 2.0 release identified above. Before any
 future upgrade, re-check the exact tag's `LICENSE.md`, third-party notices, and
-all paths proposed for reuse. This is an engineering record, not legal advice.
+all paths proposed for reuse. Before any redistribution of this fork or an
+Atlas-built image, retain the applicable copyright, patent, trademark, and
+attribution notices, and carry prominent notices stating that modified files
+have been changed. This is an engineering record, not legal advice.
 
 ## Upstream remotes
 
