@@ -216,13 +216,11 @@ function assertDockerIgnoreExcludesAtlasDirectory(source) {
         .split(String.fromCharCode(10))
         .map((line) => line.trim())
         .filter(Boolean)
-    const phaseZeroBuildExcludedPaths = ['ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
+    const phaseZeroBuildExcludedPaths = ['.git', 'ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
 
     for (const excludedPath of phaseZeroBuildExcludedPaths) {
         assert.ok(patterns.includes(excludedPath), `The root Docker build must exclude ${excludedPath}.`)
     }
-
-    assert.ok(!patterns.includes('.git'), 'The root Docker build must not exclude .git for the Phase 0 boundary.')
 
     for (const pattern of patterns.filter((line) => line.startsWith('!'))) {
         assert.doesNotMatch(
@@ -742,15 +740,15 @@ test('root container build context excludes the non-production adapter', () => {
 })
 
 test('root container build exclusion requires Phase 0 reconnaissance artifacts to remain out of the image', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n'), /must exclude ATLAS_UPSTREAM/i)
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('.git\natlas/\n'), /must exclude ATLAS_UPSTREAM/i)
 })
 
-test('root container build exclusion does not change unrelated upstream build inputs', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'), /must not exclude \.git/i)
+test('root container build exclusion prevents Git objects from carrying the Phase 0 boundary into the image', () => {
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('ATLAS_UPSTREAM.md\natlas/\ndocs/\n'), /must exclude \.git/i)
 })
 
 test('root container build exclusion rejects globbed atlas re-includes', () => {
-    const requiredExclusions = 'ATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+    const requiredExclusions = '.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
 
     assert.throws(
         () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!**/atlas/**\n`),
