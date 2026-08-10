@@ -132,6 +132,16 @@ credential based on Atlas tenant or project access. It is an
 instance-administration and data-egress boundary, not a tenant-safe integration
 API.
 
+The same header reaches non-whitelisted internal execution paths when Basic Auth
+is absent. `/api/v1/internal-prediction` invokes Flowise's internal build path,
+which bypasses the per-flow API-key and allowed-origin checks; its streaming
+path also accepts a supplied `chatId` before validation. `/api/v1/vector/internal-upsert/:id`
+uses the corresponding internal vector-upsert path. These routes are not
+tenant-safe alternatives to the public routes, and a bound Flowise flow API key
+or allowed origin is not a defense against them. A future private ingress must
+strip client-supplied `x-request-from` and deny direct access to both internal
+and public Flowise execution routes; no transport is authorized by this record.
+
 Flowise's end-user **Flowise embed** widget is also out of scope. Its generated
 snippet loads an unpinned third-party CDN asset and uses Flowise public-chatflow
 and chatbot-config routes. Atlas requires an Atlas-owned end-user experience;
