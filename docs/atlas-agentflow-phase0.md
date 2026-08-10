@@ -122,12 +122,15 @@ these endpoints and independently authorize every flow invocation; Flowise
 `apikeyid`, `isPublic`, chat ID, and allowed-origin fields are untrusted runtime
 configuration, not Atlas claims.
 
-`/api/v1/export-import` is API-key-gated rather than whitelisted, but its API
-key is instance-global and can read or write the instance's flows, agentflows,
-tools, variables, and assistants. A future contained transport must not expose
-this endpoint or grant its credential based on Atlas tenant or project access.
-It is an instance-administration and data-egress boundary, not a tenant-safe
-integration API.
+`/api/v1/export-import` is not whitelisted, but it is not reliably API-key
+gated in the default posture: when Basic Auth is absent, a client-settable
+`x-request-from: internal` header reaches this endpoint without an API key. If
+an API key is evaluated, it is instance-global and can read or write the
+instance's flows, agentflows, tools, variables, and assistants. A future
+contained transport must not expose this endpoint or grant an instance
+credential based on Atlas tenant or project access. It is an
+instance-administration and data-egress boundary, not a tenant-safe integration
+API.
 
 Flowise's end-user **Flowise embed** widget is also out of scope. Its generated
 snippet loads an unpinned third-party CDN asset and uses Flowise public-chatflow
@@ -176,11 +179,12 @@ relying on it as an ingress control.
 ## Repository-automation reconnaissance
 
 As observed on 2026-08-06, `avi2l/atlas-flowise` has no repository Actions
-secrets configured and its `main` branch has no branch-protection rule. This
-means no repository-scoped secrets were configured at the time of this check,
-but it does not establish the absence of organization-level or environment-level
-secrets. The lack of branch protection leaves their `main` triggers governed
-only by process.
+secrets configured. This means no repository-scoped secrets were configured at
+the time of this check. This finding does not establish the absence of
+organization-level or environment-level secrets. As verified on 2026-08-10,
+neither `main` nor `atlas/pinned-flowise-2.2.7` has a branch-protection rule.
+The lack of branch protection leaves their triggers and the pinned-baseline
+containment controls governed only by process.
 `autoSyncSingleCommit.yml` and `autoSyncMergedPullRequest.yml` dispatch commit
 or pull-request metadata to the repository named by `AUTOSYNC_CH_URL` when
 `AUTOSYNC_*` secrets are later added; the latter also uses
@@ -304,11 +308,14 @@ The standalone `Atlas AgentFlow Adapter Boundary` workflow is constrained by
 this contract test to its single Node 20 contract step, without installing or
 starting Flowise. It runs only for pushes to, and pull requests whose base is,
 the slash-containing pinned baseline (`atlas/pinned-flowise-2.2.7`); that slash
-does not match the inherited PR workflows' slash-free base filter. Do not target
-an un-slashed base or merge this branch to `main`, because either path can start
-inherited Flowise work with its default telemetry posture until the separate CI
-and telemetry security decision is recorded. The contract also protects the root
-container-build exclusion for `atlas/`. The separate inherited `docker/Dockerfile`
+does not match the inherited PR workflows' slash-free base filter. This is a
+regression check, not an enforcement boundary against an adversarial edit: the
+workflow and its test execute from the proposed revision, and the pinned
+baseline has no branch-protection rule. Do not target an un-slashed base or merge
+this branch to `main`, because either path can start inherited Flowise work with
+its default telemetry posture until the separate CI and telemetry security
+decision is recorded. The contract also protects the root container-build
+exclusion for `atlas/`. The separate inherited `docker/Dockerfile`
 is built with the repository context, which is also subject to `.dockerignore`,
 but it does not copy repository files into its image. The inherited standard
 Flowise CI workflow was intentionally left unchanged to avoid coupling this

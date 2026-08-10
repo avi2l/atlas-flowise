@@ -349,12 +349,35 @@ test('Phase 0 documentation requires canonical ingress paths before Flowise rewr
 })
 
 test('Phase 0 documentation limits its repository-secret finding to repository scope', () => {
-    assert.match(phaseZeroDocumentationSource, /does not establish the absence of organization-level or environment-level\s+secrets/i)
+    assert.match(phaseZeroDocumentationSource, /does not establish the absence of\s+organization-level or environment-level\s+secrets/i)
 })
 
 test('Phase 0 documentation records Flowise default-open execution and export-import as authorization boundaries', () => {
     assert.match(phaseZeroDocumentationSource, /default-open execution/i)
     assert.match(phaseZeroDocumentationSource, /\/api\/v1\/export-import/)
+})
+
+test('Phase 0 documentation records that the client-settable internal header reaches export-import without an API key', () => {
+    assert.match(phaseZeroDocumentationSource, /x-request-from:\s*internal/i)
+    assert.match(phaseZeroDocumentationSource, /export-import[\s\S]*without an API key/i)
+})
+
+function assertRepositoryAutomationDocumentsUnprotectedPinnedBaseline(source) {
+    assert.match(source, /Neither `main` nor\s+`atlas\/pinned-flowise-2\.2\.7` has a branch-protection rule\./i)
+}
+
+test('Phase 0 documentation records the unprotected pinned baseline and limits CI containment claims', () => {
+    assertRepositoryAutomationDocumentsUnprotectedPinnedBaseline(phaseZeroDocumentationSource)
+    assert.match(phaseZeroDocumentationSource, /not an enforcement boundary against an adversarial edit/i)
+})
+
+test('pinned-baseline protection claim cannot be satisfied by the verification section', () => {
+    assert.doesNotThrow(() => assertRepositoryAutomationDocumentsUnprotectedPinnedBaseline(phaseZeroDocumentationSource))
+
+    const verificationOnlyDecoy =
+        'The pinned baseline (`atlas/pinned-flowise-2.2.7`) has no branch-protection rule in its verification section.'
+
+    assert.throws(() => assertRepositoryAutomationDocumentsUnprotectedPinnedBaseline(verificationOnlyDecoy))
 })
 
 test('Phase 0 documentation names unauthenticated lead reads and vector-upsert as ingress risks', () => {
