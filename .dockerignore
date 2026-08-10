@@ -8,4 +8,6 @@ build
 
 packages/server/.env
 packages/ui/.env
+ATLAS_UPSTREAM.md
 atlas/
+docs/

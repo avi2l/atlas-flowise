@@ -46,7 +46,8 @@ const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'u
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeRootDirectory = path.join(__dirname, '../..')
-const flowiseRuntimeIgnoredDirectories = ['.git', '.turbo', 'atlas', 'build', 'dist', 'docs', 'node_modules']
+const rootFlowiseRuntimeIgnoredDirectories = ['atlas', 'docs']
+const nestedFlowiseRuntimeIgnoredDirectories = ['.git', '.turbo', 'build', 'dist', 'node_modules']
 const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
 const expectedAdapterWorkflowSource = [
     'name: Atlas AgentFlow Adapter Boundary',
@@ -164,7 +165,11 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
         const isHuskyHook =
             (entryParent === '.husky' || (path.basename(rootDirectory) === '.husky' && entryParent === '')) && extension === ''
 
-        if (entry.isDirectory() && !flowiseRuntimeIgnoredDirectories.includes(entry.name)) {
+        const entryRelativePath = path.relative(rootDirectory, entryPath)
+        const isIgnoredRootDirectory = entryRelativePath === entry.name && rootFlowiseRuntimeIgnoredDirectories.includes(entry.name)
+        const isIgnoredNestedDirectory = nestedFlowiseRuntimeIgnoredDirectories.includes(entry.name)
+
+        if (entry.isDirectory() && !isIgnoredRootDirectory && !isIgnoredNestedDirectory) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
         } else if (
             entry.isFile() &&
@@ -190,7 +195,7 @@ function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlo
     for (const { name, source } of runtimeSources) {
         assert.doesNotMatch(
             source,
-            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|(?:^|[\s"'`])atlas[\\/]|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im,
+            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im,
             name
         )
     }
@@ -201,14 +206,17 @@ function assertDockerIgnoreExcludesAtlasDirectory(source) {
         .split(String.fromCharCode(10))
         .map((line) => line.trim())
         .filter(Boolean)
+    const phaseZeroBuildExcludedPaths = ['ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
 
-    assert.ok(patterns.includes('atlas/'), 'The root Docker build must exclude atlas/.')
+    for (const excludedPath of phaseZeroBuildExcludedPaths) {
+        assert.ok(patterns.includes(excludedPath), `The root Docker build must exclude ${excludedPath}.`)
+    }
 
     for (const pattern of patterns.filter((line) => line.startsWith('!'))) {
         assert.doesNotMatch(
             pattern.slice(1),
-            /(?:^|\/|\*\*)(?:atlas|agentflow-adapter)(?:\/|\*|$)/i,
-            'Docker ignore rules must not re-include atlas/.'
+            /(?:^|\/|\*\*)(?:atlas|agentflow-adapter|docs)(?:\/|\*|$)|(?:^|\/)ATLAS_UPSTREAM\.md$/i,
+            'Docker ignore rules must not re-include Phase 0 reconnaissance artifacts.'
         )
     }
 }
@@ -695,10 +703,25 @@ test('root container build context excludes the non-production adapter', () => {
     assertDockerIgnoreExcludesAtlasDirectory(dockerIgnoreSource)
 })
 
+test('root container build exclusion requires Phase 0 reconnaissance artifacts to remain out of the image', () => {
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n'), /must exclude ATLAS_UPSTREAM\.md/i)
+})
+
 test('root container build exclusion rejects globbed atlas re-includes', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!**/atlas/**\n'), /must not re-include atlas/i)
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!atlas*\n'), /must not re-include atlas/i)
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n!**/agentflow-adapter/**\n'), /must not re-include atlas/i)
+    const requiredExclusions = 'ATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+
+    assert.throws(
+        () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!**/atlas/**\n`),
+        /must not re-include Phase 0 reconnaissance artifacts/i
+    )
+    assert.throws(
+        () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!atlas*\n`),
+        /must not re-include Phase 0 reconnaissance artifacts/i
+    )
+    assert.throws(
+        () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!**/agentflow-adapter/**\n`),
+        /must not re-include Phase 0 reconnaissance artifacts/i
+    )
 })
 
 test('Flowise containment discovery scans new top-level runtime directories', () => {
@@ -712,6 +735,23 @@ test('Flowise containment discovery scans new top-level runtime directories', ()
         assert.ok(
             collectFlowiseRuntimeSources(fixtureDirectory).some(({ name }) => name === 'new-runtime/deploy.ps1'),
             'New top-level runtime directories must be included in containment scanning.'
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('Flowise containment discovery scans nested Atlas-named runtime directories', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+    const runtimeDirectory = path.join(fixtureDirectory, 'packages', 'server', 'src', 'atlas')
+
+    try {
+        fs.mkdirSync(runtimeDirectory, { recursive: true })
+        fs.writeFileSync(path.join(runtimeDirectory, 'bridge.js'), "require('../../../../atlas/agentflow-adapter')\n")
+
+        assert.ok(
+            collectFlowiseRuntimeSources(fixtureDirectory).some(({ name }) => name === 'packages/server/src/atlas/bridge.js'),
+            'Nested Atlas-named runtime directories must be included in containment scanning.'
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
@@ -735,6 +775,13 @@ test('Flowise workflow sources cannot couple inherited CI to the non-production 
 test('Flowise runtime sources cannot import a future Atlas sibling module', () => {
     assert.throws(
         () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source: "require('../../atlas/bridge')" }]),
+        /runtime.js/
+    )
+})
+
+test('Flowise runtime sources cannot import an Atlas module nested below another sibling', () => {
+    assert.throws(
+        () => assertFlowiseRuntimeDoesNotReferenceAdapter([{ name: 'runtime.js', source: "require('../services/atlas/bridge')" }]),
         /runtime.js/
     )
 })
