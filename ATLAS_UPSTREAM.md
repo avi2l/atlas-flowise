@@ -87,7 +87,8 @@ Atlas-built image, include a copy of the Apache-2.0 license, retain the
 applicable copyright, patent, trademark, and attribution notices, and carry
 prominent notices stating that modified files have been changed. Reproduce any
 upstream `NOTICE` file; no upstream NOTICE file is present at `cf7d841`. This is
-an engineering record, not legal advice.
+an engineering record, not legal advice. Apache-2.0 does not grant trademark
+rights; any use of Flowise names or marks requires a separate review.
 
 ## Upstream remotes
 

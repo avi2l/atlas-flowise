@@ -94,8 +94,9 @@ security control.
 
 In the pinned release, `WHITELIST_URLS` is checked with `req.path.startsWith`.
 The following are the complete 20 unauthenticated `/api/v1` prefixes recorded
-from `packages/server/src/utils/constants.ts`; they are not an allow-list for a
-future Atlas ingress:
+from `packages/server/src/utils/constants.ts`. They are a subset of the broader
+internal-header exposure described below, not an allow-list for a future Atlas
+ingress:
 
 ```text
 /api/v1/verify/apikey/                 /api/v1/chatflows/apikey/
@@ -139,6 +140,11 @@ credential based on Atlas tenant or project access. It is an
 instance-administration and data-egress boundary, not a tenant-safe integration
 API.
 
+This header bypass applies to the entire non-whitelisted `/api/v1` surface, not
+only the routes named here. For example, `GET /api/v1/credentials/:id` returns a
+decrypted `plainDataObj`. Credential, variable, and API-key administration are
+therefore maximal exposure cases, not tenant-safe integration APIs.
+
 The same header reaches non-whitelisted internal execution paths when Basic Auth
 is absent. `/api/v1/internal-prediction` invokes Flowise's internal build path,
 which bypasses the per-flow API-key and allowed-origin checks; its streaming
@@ -148,6 +154,8 @@ tenant-safe alternatives to the public routes, and a bound Flowise flow API key
 or allowed origin is not a defense against them. A future private ingress must
 strip client-supplied `x-request-from` and deny direct access to both internal
 and public Flowise execution routes; no transport is authorized by this record.
+`internal-prediction` and `internal-upsert` also do not apply Flowise's external
+rate-limit middleware, so Atlas and private ingress must own rate limiting.
 
 Flowise's end-user **Flowise embed** widget is also out of scope. Its generated
 snippet loads an unpinned third-party CDN asset and uses Flowise public-chatflow
@@ -243,8 +251,8 @@ Do **not** implement a transport until Atlas approves all of the following:
 3. Deployment containment: private network boundary, ingress policy, and
    operational ownership of the isolated Flowise runtime. The ingress must
    terminate and re-mint all client-supplied authentication and identity headers
-   (`Authorization`, `x-request-from`, and cookies); no client-controlled header
-   reaches Flowise. It must deny public/UI and `/admin/queues` access, normalize
+   (`Authorization`, `x-request-from`, and cookies), and forward only an
+   Atlas-generated allow-list of headers to Flowise. It must deny public/UI and `/admin/queues` access, normalize
    or reject traversal and encoded path forms before applying
    any allow-list, and explicitly handle the complete Flowise prefix allow-list
    before any transport exists.
@@ -342,7 +350,7 @@ is built with the repository context, which is also subject to `.dockerignore`,
 but it does not copy repository files into its image. The inherited standard
 Flowise CI workflow was intentionally left unchanged to avoid coupling this
 isolated check to a full Flowise dependency installation. The `atlas/` directory
-exclusion records the skeleton's separation from Flowise runtime images.
+exclusion enforces the skeleton's separation from Flowise runtime images.
 
 The repository-wide Flowise build was not treated as a release signal in this
 Phase-0 change: the local environment has Node `24.14.0`, while the pinned
