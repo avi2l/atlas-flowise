@@ -161,7 +161,7 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
 
         const extension = path.extname(entry.name)
         const entryParent = path.relative(rootDirectory, path.dirname(entryPath))
-        const isBinEntryScript = entryParent === 'bin' && (extension === '' || extension === '.cmd')
+        const isBinEntryScript = entryParent.split(path.sep).includes('bin') && (extension === '' || extension === '.cmd')
         const isHuskyHook =
             (entryParent === '.husky' || (path.basename(rootDirectory) === '.husky' && entryParent === '')) && extension === ''
 
@@ -206,7 +206,7 @@ function assertDockerIgnoreExcludesAtlasDirectory(source) {
         .split(String.fromCharCode(10))
         .map((line) => line.trim())
         .filter(Boolean)
-    const phaseZeroBuildExcludedPaths = ['ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
+    const phaseZeroBuildExcludedPaths = ['.git', 'ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
 
     for (const excludedPath of phaseZeroBuildExcludedPaths) {
         assert.ok(patterns.includes(excludedPath), `The root Docker build must exclude ${excludedPath}.`)
@@ -420,6 +420,32 @@ test('runtime source collection includes extensionless and Windows bin entry scr
                 .map(({ name }) => name)
                 .sort(),
             ['bin/run', 'bin/run.cmd']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes nested extensionless bin entry scripts for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+    const nestedBinDirectory = path.join(fixtureDirectory, 'packages', 'server', 'bin')
+
+    try {
+        fs.mkdirSync(nestedBinDirectory, { recursive: true })
+        fs.writeFileSync(
+            path.join(nestedBinDirectory, 'run'),
+            "#!/usr/bin/env node\nrequire('../../../../atlas/agentflow-adapter/adapter')\n"
+        )
+        fs.writeFileSync(
+            path.join(nestedBinDirectory, 'dev'),
+            "#!/usr/bin/env node\nrequire('../../../../atlas/agentflow-adapter/adapter')\n"
+        )
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['packages/server/bin/dev', 'packages/server/bin/run']
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
@@ -704,11 +730,11 @@ test('root container build context excludes the non-production adapter', () => {
 })
 
 test('root container build exclusion requires Phase 0 reconnaissance artifacts to remain out of the image', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n'), /must exclude ATLAS_UPSTREAM\.md/i)
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n'), /must exclude \.git/i)
 })
 
 test('root container build exclusion rejects globbed atlas re-includes', () => {
-    const requiredExclusions = 'ATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+    const requiredExclusions = '.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
 
     assert.throws(
         () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!**/atlas/**\n`),
