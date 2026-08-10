@@ -2,6 +2,8 @@
 
 **Status:** reconnaissance complete; adapter remains deliberately disabled.
 **Scope:** Flowise `2.2.7`, pinned at `cf7d841f88504bba465790eb906f6d758b91ee2c`.
+Every Flowise behavior and authentication finding below applies only to that
+pinned tree, not to the separate `main` line.
 No upstream synchronization, package upgrade, external deployment, credential
 import, production-data access, database change, or identity/security architecture
 change was performed. Inherited repository CI can start local Flowise and Docker

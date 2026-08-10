@@ -33,12 +33,16 @@ than following upstream `main` automatically.
 ## Fork policy
 
 1. Do not merge or sync upstream automatically.
-2. Evaluate upstream fixes one at a time for security, license, API compatibility,
+2. `main` must not be used as an Atlas merge target: it tracks Flowise `3.1.4`,
+   whose license identifies a commercial-license boundary outside the pinned
+   Apache-2.0 baseline. Atlas work must target the recorded pinned baseline or a
+   separately approved descendant of it.
+3. Evaluate upstream fixes one at a time for security, license, API compatibility,
    and Atlas product fit.
-3. Keep Atlas project, actor, assignment, review, event-outbox, and governance
+4. Keep Atlas project, actor, assignment, review, event-outbox, and governance
    records outside Flowise's database in the separate AgentFlow service.
-4. Treat Flowise as an isolated workflow/canvas runtime behind Atlas-owned APIs.
-5. Record every accepted upstream cherry-pick in this file with source commit,
+5. Treat Flowise as an isolated workflow/canvas runtime behind Atlas-owned APIs.
+6. Record every accepted upstream cherry-pick in this file with source commit,
    rationale, and license review.
 
 ## Inherited automation review gate
