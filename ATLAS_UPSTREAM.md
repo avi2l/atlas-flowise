@@ -7,6 +7,8 @@
 -   **Pinned release:** `flowise@2.2.7`
 -   **Pinned commit:** `cf7d841f88504bba465790eb906f6d758b91ee2c`
 -   **Baseline branch:** `atlas/pinned-flowise-2.2.7`
+-   **Baseline protection:** no branch-protection rule as verified on 2026-08-10;
+    this pin is governed by process, not a GitHub enforcement control.
 -   **Pinned on:** 2026-08-03
 
 ### Main-branch containment
@@ -81,9 +83,11 @@ production data into this repository.
 This repository is based on the Apache 2.0 release identified above. Before any
 future upgrade, re-check the exact tag's `LICENSE.md`, third-party notices, and
 all paths proposed for reuse. Before any redistribution of this fork or an
-Atlas-built image, retain the applicable copyright, patent, trademark, and
-attribution notices, and carry prominent notices stating that modified files
-have been changed. This is an engineering record, not legal advice.
+Atlas-built image, include a copy of the Apache-2.0 license, retain the
+applicable copyright, patent, trademark, and attribution notices, and carry
+prominent notices stating that modified files have been changed. Reproduce any
+upstream `NOTICE` file; no upstream NOTICE file is present at `cf7d841`. This is
+an engineering record, not legal advice.
 
 ## Upstream remotes
 

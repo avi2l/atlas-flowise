@@ -56,6 +56,13 @@ Isolated pinned Flowise 2.2.7 runtime
   - does not become an Atlas identity or authorization authority
 ```
 
+In its default posture, the pinned release is effectively unauthenticated for
+Atlas purposes: a client-controlled header bypasses its API-key middleware, and
+the UI/canvas and queue administration sit outside that middleware. Network
+containment is the only control until an approved private ingress and
+Atlas-owned authorization layer exist; Flowise authentication is never an Atlas
+security control.
+
 ### Ownership invariants
 
 1. Flowise is never directly exposed to Atlas clients.
@@ -218,8 +225,11 @@ Its only behavior is fail-closed:
 -   The rejected error identifies only the attempted operation (`run` or
     `abort`); it carries no request data.
 
-No request shape is accepted. This establishes a minimal future seam without
-defining an Atlas credential, actor, permission, data, or transport protocol.
+No request shape is accepted. The closed surface is a deliberate tripwire, not a
+production lifecycle contract: any additional verb requires an explicit
+contract-test change and a stop-gate-2/4 decision. This establishes a minimal
+future seam without defining an Atlas credential, actor, permission, data, or
+transport protocol.
 
 ## Security-sensitive decisions deferred (stop gates)
 
@@ -232,8 +242,10 @@ Do **not** implement a transport until Atlas approves all of the following:
    supplied by a client cannot be trusted or forwarded as an Atlas run scope.
 3. Deployment containment: private network boundary, ingress policy, and
    operational ownership of the isolated Flowise runtime. The ingress must
-   strip client-supplied `x-request-from`, deny public/UI and `/admin/queues`
-   access, normalize or reject traversal and encoded path forms before applying
+   terminate and re-mint all client-supplied authentication and identity headers
+   (`Authorization`, `x-request-from`, and cookies); no client-controlled header
+   reaches Flowise. It must deny public/UI and `/admin/queues` access, normalize
+   or reject traversal and encoded path forms before applying
    any allow-list, and explicitly handle the complete Flowise prefix allow-list
    before any transport exists.
 4. Run lifecycle semantics, especially cancellation and human-in-the-loop
@@ -324,14 +336,13 @@ workflow and its test execute from the proposed revision, and the pinned
 baseline has no branch-protection rule. Do not target an un-slashed base or merge
 this branch to `main`, because either path can start inherited Flowise work with
 its default telemetry posture until the separate CI and telemetry security
-decision is recorded. The contract also protects the root container-build
-exclusion for `atlas/`. The separate inherited `docker/Dockerfile`
+decision is recorded. The contract also regression-checks the root
+container-build exclusion for `atlas/`. The separate inherited `docker/Dockerfile`
 is built with the repository context, which is also subject to `.dockerignore`,
 but it does not copy repository files into its image. The inherited standard
 Flowise CI workflow was intentionally left unchanged to avoid coupling this
 isolated check to a full Flowise dependency installation. The `atlas/` directory
-is excluded from Flowise container build contexts, preserving the skeleton's
-separation from Flowise runtime images.
+exclusion records the skeleton's separation from Flowise runtime images.
 
 The repository-wide Flowise build was not treated as a release signal in this
 Phase-0 change: the local environment has Node `24.14.0`, while the pinned
