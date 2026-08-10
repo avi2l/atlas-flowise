@@ -404,7 +404,7 @@ test('Phase 0 documentation accurately scopes inherited Flowise pull-request tri
 
 test('upstream policy records Apache-2.0 notice and modification-notice obligations for future distribution', () => {
     assert.match(atlasUpstreamSource, /retain[\s\S]*copyright[\s\S]*patent[\s\S]*trademark[\s\S]*attribution[\s\S]*notices/i)
-    assert.match(atlasUpstreamSource, /carry prominent notices stating[\s\S]*modified/i)
+    assert.match(atlasUpstreamSource, /carry\s+prominent notices stating[\s\S]*modified/i)
 })
 
 test('adapter README identifies adapter.js as the limited static-tripwire scope', () => {
