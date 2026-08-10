@@ -75,7 +75,8 @@ Isolated pinned Flowise 2.2.7 runtime
    flow API-key binding or marks a flow public is an authorization-sensitive
    change and cannot make an Atlas flow executable or visible.
 7. The disabled local skeleton has no execution, I/O, configuration, or secret
-   loading behavior. Its source-level static tripwire and closed directory
+   loading behavior. The Phase-0 `atlas/` directory is closed to the adapter
+   skeleton, and its source-level static tripwire and closed directory
    allow-list are regression guards, not an adversarial-edit control or a
    complete proof against indirect JavaScript runtime capabilities.
 8. Flowise persistent state, uploads, and backups are separate contained data
@@ -272,6 +273,10 @@ Do **not** implement a transport until Atlas approves all of the following:
     content type and disposition. Model-authored content and links require an
     allow-listed rendering policy, and there must be no verbatim relay of
     Flowise errors to end users.
+17. Runtime operational ownership: monitoring, alerting, incident response, and
+    on-call ownership for the contained Flowise dependency and its ingress must
+    be assigned. The Atlas boundary must also define outage behavior,
+    idempotency, and duplicate-execution handling before it submits a run.
 
 These are architecture decisions with security impact. Their absence is why
 this Phase-0 adapter stays disabled. The inherited repository-dispatch and

@@ -13,8 +13,8 @@ They do not inspect caller arguments, make network calls, read
 configuration or environment variables, accept credentials, persist data, or
 call Flowise. Its exported dependency declaration is intentionally empty; it
 is a declarative marker, while the static tripwire is the enforcing regression
-guard. The contract
-test closed-lists every file in this directory. Its static tripwire is limited
+guard. The contract test closed-lists the Phase 0 `atlas/` boundary to this
+directory and every file in it. Its static tripwire is limited
 to `adapter.js` and rejects imports and common filesystem, network,
 process-environment, and child-process access; neither check is a complete proof
 against every indirect JavaScript runtime capability.
