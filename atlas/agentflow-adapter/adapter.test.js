@@ -14,6 +14,14 @@ function assertSupportedDirectoryEntry(entry, entryPath) {
     }
 }
 
+function assertAtlasPhaseZeroDirectory(directory) {
+    const entries = fs.readdirSync(directory, { withFileTypes: true })
+    const entryNames = entries.map(({ name }) => name).sort()
+
+    assert.deepEqual(entryNames, ['agentflow-adapter'], 'Unexpected Phase 0 Atlas boundary entries')
+    assert.ok(entries[0].isDirectory(), 'The Phase 0 Atlas boundary entry must be a directory.')
+}
+
 function readAdapterSourceFiles(directory) {
     const entries = fs.readdirSync(directory, { withFileTypes: true })
     const entryNames = entries.map(({ name }) => name).sort()
@@ -31,6 +39,8 @@ function readAdapterSourceFiles(directory) {
         }
     })
 }
+
+assertAtlasPhaseZeroDirectory(path.join(__dirname, '..'))
 
 const adapterDirectoryEntries = readAdapterSourceFiles(__dirname)
 const adapterSources = adapterDirectoryEntries.filter(({ name }) => name === 'adapter.js')
@@ -206,11 +216,13 @@ function assertDockerIgnoreExcludesAtlasDirectory(source) {
         .split(String.fromCharCode(10))
         .map((line) => line.trim())
         .filter(Boolean)
-    const phaseZeroBuildExcludedPaths = ['.git', 'ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
+    const phaseZeroBuildExcludedPaths = ['ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
 
     for (const excludedPath of phaseZeroBuildExcludedPaths) {
         assert.ok(patterns.includes(excludedPath), `The root Docker build must exclude ${excludedPath}.`)
     }
+
+    assert.ok(!patterns.includes('.git'), 'The root Docker build must not exclude .git for the Phase 0 boundary.')
 
     for (const pattern of patterns.filter((line) => line.startsWith('!'))) {
         assert.doesNotMatch(
@@ -730,11 +742,15 @@ test('root container build context excludes the non-production adapter', () => {
 })
 
 test('root container build exclusion requires Phase 0 reconnaissance artifacts to remain out of the image', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n'), /must exclude \.git/i)
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('atlas/\n'), /must exclude ATLAS_UPSTREAM/i)
+})
+
+test('root container build exclusion does not change unrelated upstream build inputs', () => {
+    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'), /must not exclude \.git/i)
 })
 
 test('root container build exclusion rejects globbed atlas re-includes', () => {
-    const requiredExclusions = '.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+    const requiredExclusions = 'ATLAS_UPSTREAM.md\natlas/\ndocs/\n'
 
     assert.throws(
         () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!**/atlas/**\n`),
@@ -871,6 +887,19 @@ test('Flowise containment scan includes established runtime and control surfaces
 
     for (const sourceName of ['.github/workflows/main.yml', '.husky/pre-commit', 'Dockerfile', 'metrics/otel/compose.yaml']) {
         assert.ok(sourceNames.has(sourceName), `${sourceName} must be included in containment scanning.`)
+    }
+})
+
+test('Phase 0 Atlas boundary rejects an additional transport directory', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-phase-zero-'))
+
+    try {
+        fs.mkdirSync(path.join(fixtureDirectory, 'agentflow-adapter'))
+        fs.mkdirSync(path.join(fixtureDirectory, 'transport'))
+
+        assert.throws(() => assertAtlasPhaseZeroDirectory(fixtureDirectory), /transport/)
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
     }
 })
 
