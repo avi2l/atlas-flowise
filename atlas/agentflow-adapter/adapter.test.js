@@ -151,7 +151,9 @@ const runtimeSourceExtensions = new Set([
     '.json',
     '.jsx',
     '.mjs',
+    '.mts',
     '.ps1',
+    '.py',
     '.sh',
     '.toml',
     '.ts',
@@ -183,7 +185,11 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
         } else if (
             entry.isFile() &&
-            (entry.name === 'Dockerfile' || runtimeSourceExtensions.has(extension) || isBinEntryScript || isHuskyHook)
+            (entry.name === 'Dockerfile' ||
+                entry.name === 'Makefile' ||
+                runtimeSourceExtensions.has(extension) ||
+                isBinEntryScript ||
+                isHuskyHook)
         ) {
             sourceFiles.push({
                 name: path.relative(rootDirectory, entryPath).split(path.sep).join('/'),
@@ -223,11 +229,7 @@ function assertDockerIgnoreExcludesAtlasDirectory(source) {
     }
 
     for (const pattern of patterns.filter((line) => line.startsWith('!'))) {
-        assert.doesNotMatch(
-            pattern.slice(1),
-            /(?:^|\/|\*\*)(?:atlas|agentflow-adapter|docs)(?:\/|\*|$)|(?:^|\/)ATLAS_UPSTREAM\.md$/i,
-            'Docker ignore rules must not re-include Phase 0 reconnaissance artifacts.'
-        )
+        assert.fail(`Docker ignore rules must not re-include Phase 0 reconnaissance artifacts: ${pattern}`)
     }
 }
 
@@ -409,6 +411,25 @@ test('runtime source collection reads only explicit source file types', () => {
                 .map(({ name }) => name)
                 .sort(),
             ['runtime.js']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes common build and runtime source types for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        fs.writeFileSync(path.join(fixtureDirectory, 'Makefile'), 'node atlas/agentflow-adapter/adapter.js\n')
+        fs.writeFileSync(path.join(fixtureDirectory, 'deploy.py'), 'import atlas.agentflow_adapter\n')
+        fs.writeFileSync(path.join(fixtureDirectory, 'runtime.mts'), "import '../../atlas/agentflow-adapter'\n")
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['Makefile', 'deploy.py', 'runtime.mts']
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
@@ -762,6 +783,17 @@ test('root container build exclusion rejects globbed atlas re-includes', () => {
         () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!**/agentflow-adapter/**\n`),
         /must not re-include Phase 0 reconnaissance artifacts/i
     )
+})
+
+test('root container build exclusion rejects broad negations that could re-include Phase 0 artifacts', () => {
+    const requiredExclusions = '.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+
+    for (const negation of ['!**', '!*']) {
+        assert.throws(
+            () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}${negation}\n`),
+            /must not re-include Phase 0 reconnaissance artifacts/i
+        )
+    }
 })
 
 test('Flowise containment discovery scans new top-level runtime directories', () => {
