@@ -11,6 +11,19 @@ run, or configure those jobs.
 This document records engineering observations, not an authorization to connect
 Atlas to Flowise.
 
+## Main-branch containment
+
+As observed on 2026-08-09, the repository `main` branch points to
+`ba4c6509bbc481cc7f01aab3d1aa33a2aea886f1`, 769 commits beyond this document's
+pinned baseline. Its `LICENSE.md` contains commercial-license terms and its
+tree contains `packages/server/src/enterprise/`. `main` is not the Atlas line
+and has not been license-reviewed. It must not be merged into or used as a base
+merely after CI concerns are resolved. Its disposition requires an explicit
+owner decision: reset it to the pin, retire it in favour of
+`atlas/pinned-flowise-2.2.7` as the default branch, or retain it only as an
+explicitly quarantined upstream mirror. The inherited-workflow and telemetry
+gates below are additional constraints, not a path to make `main` approved.
+
 ## Compatibility findings
 
 | Area                       | Observation in the pinned tree                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Integration consequence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |

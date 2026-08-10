@@ -489,6 +489,14 @@ test('Phase 0 documentation gates inherited CI for un-slashed PR bases and main 
     assert.match(phaseZeroDocumentationSource, /do not target an un-slashed branch or merge this branch to `main`/i)
 })
 
+test('Atlas documentation rejects main as an approved baseline pending explicit owner disposition', () => {
+    for (const source of [atlasUpstreamSource, phaseZeroDocumentationSource]) {
+        assert.match(source, /`main` is not the Atlas line\s+and\s+has not been license-reviewed/i)
+        assert.match(source, /must not be merged into or used as a base\s+merely after CI concerns are resolved/i)
+        assert.match(source, /disposition requires an explicit\s+owner decision/i)
+    }
+})
+
 test('Phase 0 documentation permits adapter contract pushes and pull requests only against the pinned baseline', () => {
     assert.match(
         phaseZeroDocumentationSource,
