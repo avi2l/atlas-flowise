@@ -237,7 +237,7 @@ function assertDockerIgnoreExcludesAtlasDirectory(source) {
         .split(String.fromCharCode(10))
         .map((line) => line.trim())
         .filter(Boolean)
-    const phaseZeroBuildExcludedPaths = ['.git', 'ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
+    const phaseZeroBuildExcludedPaths = ['.git', '.github/workflows/atlas-agentflow-adapter.yml', 'ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
 
     for (const excludedPath of phaseZeroBuildExcludedPaths) {
         assert.ok(patterns.includes(excludedPath), `The root Docker build must exclude ${excludedPath}.`)
@@ -457,6 +457,10 @@ test('upstream policy records Apache-2.0 notice and modification-notice obligati
 
 test('adapter README identifies adapter.js as the limited static-tripwire scope', () => {
     assert.match(adapterReadmeSource, /static tripwire is limited\s+to `adapter\.js`/)
+})
+
+test('adapter README does not overstate the runtime-source containment scan', () => {
+    assert.match(adapterReadmeSource, /does not scan every possible file type/i)
 })
 
 test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
@@ -909,15 +913,21 @@ test('root container build context excludes the non-production adapter', () => {
 })
 
 test('root container build exclusion requires Phase 0 reconnaissance artifacts to remain out of the image', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('.git\natlas/\n'), /must exclude ATLAS_UPSTREAM/i)
+    assert.throws(
+        () => assertDockerIgnoreExcludesAtlasDirectory('.git\n.github/workflows/atlas-agentflow-adapter.yml\natlas/\n'),
+        /must exclude ATLAS_UPSTREAM/i
+    )
 })
 
 test('root container build exclusion prevents Git objects from carrying the Phase 0 boundary into the image', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('ATLAS_UPSTREAM.md\natlas/\ndocs/\n'), /must exclude \.git/i)
+    assert.throws(
+        () => assertDockerIgnoreExcludesAtlasDirectory('.github/workflows/atlas-agentflow-adapter.yml\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'),
+        /must exclude \.git/i
+    )
 })
 
 test('root container build exclusion rejects globbed atlas re-includes', () => {
-    const requiredExclusions = '.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+    const requiredExclusions = '.git\n.github/workflows/atlas-agentflow-adapter.yml\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
 
     assert.throws(
         () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!**/atlas/**\n`),
@@ -934,7 +944,7 @@ test('root container build exclusion rejects globbed atlas re-includes', () => {
 })
 
 test('root container build exclusion rejects broad negations that could re-include Phase 0 artifacts', () => {
-    const requiredExclusions = '.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+    const requiredExclusions = '.git\n.github/workflows/atlas-agentflow-adapter.yml\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
 
     for (const negation of ['!**', '!*']) {
         assert.throws(

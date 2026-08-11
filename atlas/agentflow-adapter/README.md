@@ -16,8 +16,9 @@ is a declarative marker, while the static tripwire is the enforcing regression
 guard. The contract test closed-lists the Phase 0 `atlas/` boundary to this
 directory and every file in it. Its static tripwire is limited
 to `adapter.js` and rejects imports and common filesystem, network,
-process-environment, and child-process access; neither check is a complete proof
-against every indirect JavaScript runtime capability.
+process-environment, and child-process access. The separate runtime-source scan
+does not scan every possible file type; neither check is a complete proof against
+every indirect JavaScript runtime capability.
 
 No request contract exists in Phase 0. The adapter deliberately does not model
 Atlas users, actors, permissions, projects, assignments, credentials, inputs,

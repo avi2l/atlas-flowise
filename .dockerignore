@@ -9,6 +9,7 @@ build
 
 packages/server/.env
 packages/ui/.env
+.github/workflows/atlas-agentflow-adapter.yml
 ATLAS_UPSTREAM.md
 atlas/
 docs/
