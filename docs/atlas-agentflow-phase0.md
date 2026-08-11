@@ -242,8 +242,9 @@ Its only behavior is fail-closed:
     `abort`); it carries no request data.
 
 No request shape is accepted. The closed surface is a deliberate tripwire, not a
-production lifecycle contract: any additional verb requires an explicit
-contract-test change and a stop-gate-2/4 decision. This establishes a minimal
+production lifecycle contract: any additional verb requires all applicable
+stop-gate decisions and an explicit contract-test change; at minimum gates 2,
+3, 4, 5, 8, 9, 12, and 16 apply to a lifecycle verb.
 future seam without defining an Atlas credential, actor, permission, data, or
 transport protocol.
 
@@ -319,6 +320,10 @@ Do **not** implement a transport until Atlas approves all of the following:
     on-call ownership for the contained Flowise dependency and its ingress must
     be assigned. The Atlas boundary must also define outage behavior,
     idempotency, and duplicate-execution handling before it submits a run.
+18. Host-runtime control: Flowise must not receive a Docker daemon socket,
+    host-runtime control, or installer privileges. Any exception requires a
+    separately documented Atlas security decision and deployment-containment
+    review; the presence of a Flowise route is not an authorization to grant it.
 
 These are architecture decisions with security impact. Their absence is why
 this Phase-0 adapter stays disabled. The inherited repository-dispatch and
@@ -357,8 +362,9 @@ container-build exclusion for `atlas/`. The separate inherited `docker/Dockerfil
 is built with the repository context, which is also subject to `.dockerignore`,
 but it does not copy repository files into its image. The inherited standard
 Flowise CI workflow was intentionally left unchanged to avoid coupling this
-isolated check to a full Flowise dependency installation. The `atlas/` directory
-exclusion enforces the skeleton's separation from Flowise runtime images.
+isolated check to a full Flowise dependency installation. The root build's
+`atlas/` exclusion is a regression-checked build-context separation, not a
+guarantee against a future Dockerfile or ignore-rule change.
 
 The repository-wide Flowise build was not treated as a release signal in this
 Phase-0 change: the local environment has Node `24.14.0`, while the pinned

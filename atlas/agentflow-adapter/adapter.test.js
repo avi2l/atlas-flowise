@@ -173,6 +173,7 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
         assertSupportedDirectoryEntry(entry, entryPath)
 
         const extension = path.extname(entry.name)
+        const normalizedEntryName = entry.name.toLowerCase()
         const entryParent = path.relative(rootDirectory, path.dirname(entryPath))
         const isBinEntryScript = entryParent.split(path.sep).includes('bin') && (extension === '' || extension === '.cmd')
         const isHuskyHook =
@@ -186,9 +187,14 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
         } else if (
             entry.isFile() &&
-            (entry.name === 'Dockerfile' ||
-                entry.name.startsWith('Dockerfile.') ||
-                extension === '.dockerfile' ||
+            (normalizedEntryName === 'containerfile' ||
+                normalizedEntryName.startsWith('containerfile.') ||
+                normalizedEntryName.startsWith('containerfile-') ||
+                normalizedEntryName.endsWith('.containerfile') ||
+                normalizedEntryName === 'dockerfile' ||
+                normalizedEntryName.startsWith('dockerfile.') ||
+                normalizedEntryName.startsWith('dockerfile-') ||
+                normalizedEntryName.endsWith('.dockerfile') ||
                 entry.name === 'Makefile' ||
                 runtimeSourceExtensions.has(extension) ||
                 isBinEntryScript ||
@@ -395,6 +401,14 @@ test('Phase 0 documentation defers NVIDIA NIM host installer and container contr
     )
 })
 
+test('Phase 0 documentation prohibits host-runtime control and scopes future adapter verbs to all applicable gates', () => {
+    assert.match(phaseZeroDocumentationSource, /must not receive a Docker daemon socket/i)
+    assert.match(phaseZeroDocumentationSource, /must not receive[^.]*host-runtime control/i)
+    assert.match(phaseZeroDocumentationSource, /requires all applicable\s+stop-gate decisions/i)
+    assert.match(phaseZeroDocumentationSource, /at minimum gates 2,\s+3, 4, 5, 8, 9, 12, and 16/i)
+    assert.doesNotMatch(phaseZeroDocumentationSource, /exclusion enforces the skeleton's separation/i)
+})
+
 test('Phase 0 documentation defers the Flowise end-user embed surface to Atlas-owned UX', () => {
     assert.match(phaseZeroDocumentationSource, /Flowise embed/i)
     assert.match(phaseZeroDocumentationSource, /Atlas-owned end-user experience/i)
@@ -581,8 +595,12 @@ test('runtime source collection includes Dockerfile variants and CommonJS TypeSc
 
     try {
         const sourceByName = {
+            Containerfile: 'COPY atlas/agentflow-adapter /boundary\n',
+            'Containerfile-prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'Containerfile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'Dockerfile-prod': 'COPY atlas/agentflow-adapter /boundary\n',
             'Dockerfile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
-            'worker.dockerfile': 'COPY atlas/agentflow-adapter /boundary\n',
+            'worker.Dockerfile': 'COPY atlas/agentflow-adapter /boundary\n',
             'runtime.cts': "require('../../atlas/agentflow-adapter')\n"
         }
 
