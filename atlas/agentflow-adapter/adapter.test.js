@@ -394,7 +394,8 @@ test('Phase 0 documentation records that the client-settable internal header rea
 })
 
 function assertRepositoryAutomationDocumentsUnprotectedPinnedBaseline(source) {
-    assert.match(source, /Neither `main` nor\s+`atlas\/pinned-flowise-2\.2\.7` has a branch-protection rule\./i)
+    const reconnaissanceSource = source.split(/^## Verification\s*$/m, 1)[0]
+    assert.match(reconnaissanceSource, /Neither `main` nor\s+`atlas\/pinned-flowise-2\.2\.7` has a branch-protection rule\./i)
 }
 
 test('Phase 0 documentation records the unprotected pinned baseline and limits CI containment claims', () => {
@@ -409,6 +410,14 @@ test('pinned-baseline protection claim cannot be satisfied by the verification s
         'The pinned baseline (`atlas/pinned-flowise-2.2.7`) has no branch-protection rule in its verification section.'
 
     assert.throws(() => assertRepositoryAutomationDocumentsUnprotectedPinnedBaseline(verificationOnlyDecoy))
+
+    const protectionClaimOnlyInVerification = `# Phase 0
+
+## Verification
+
+Neither \`main\` nor \`atlas/pinned-flowise-2.2.7\` has a branch-protection rule.`
+
+    assert.throws(() => assertRepositoryAutomationDocumentsUnprotectedPinnedBaseline(protectionClaimOnlyInVerification))
 })
 
 test('Phase 0 documentation names unauthenticated lead reads and vector-upsert as ingress risks', () => {
