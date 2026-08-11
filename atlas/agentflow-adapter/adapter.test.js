@@ -222,15 +222,29 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
     )
 }
 
+const atlasAdapterReference =
+    /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+
+function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
+    assert.equal(atlasAdapterReference.test(source), false, `Flowise runtime source references the adapter: ${name}`)
+}
+
 function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
     for (const { name, source } of runtimeSources) {
-        assert.doesNotMatch(
-            source,
-            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im,
-            name
-        )
+        assertRuntimeSourceDoesNotReferenceAdapter(name, source)
     }
 }
+
+test('Flowise containment failures identify the file without exposing its contents', () => {
+    assert.throws(
+        () => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', 'const secret = "do-not-log"\nrequire("../../atlas/bridge")'),
+        (error) => {
+            assert.match(error.message, /runtime\.js/)
+            assert.doesNotMatch(error.message, /do-not-log/)
+            return true
+        }
+    )
+})
 
 function assertDockerIgnoreExcludesAtlasDirectory(source) {
     const patterns = source
@@ -411,7 +425,7 @@ function assertHostRuntimeAndStopGateDocumentation(source) {
     assert.match(source, /must\s+not\s+receive\s+a\s+Docker\s+daemon\s+socket/i)
     assert.match(source, /must\s+not\s+receive[^.]*host-runtime\s+control/i)
     assert.match(source, /requires\s+all\s+applicable\s+stop-gate\s+decisions/i)
-    assert.match(source, /at\s+minimum\s+gates\s+1,\s+2,\s+3,\s+4,\s+5,\s+8,\s+9,\s+12,\s+and\s+16/i)
+    assert.match(source, /at\s+minimum\s+gates\s+1,\s+2,\s+3,\s+4,\s+5,\s+6,\s+7,\s+8,\s+9,\s+11,\s+12,\s+and\s+16/i)
     assert.doesNotMatch(source, /exclusion enforces the skeleton's separation/i)
 }
 
@@ -433,10 +447,10 @@ test('Phase 0 stop-gate documentation guard tolerates prose reflow at every word
     assertHostRuntimeAndStopGateDocumentation(reflowedPolicy)
 })
 
-test('Phase 0 lifecycle-verb documentation includes service authentication among its minimum gates', () => {
+test('Phase 0 lifecycle-verb documentation includes every minimum security gate', () => {
     assert.match(
         phaseZeroDocumentationSource,
-        /at minimum gates 1,\s+2,\s+3,\s+4,\s+5,\s+8,\s+9,\s+12,\s+and\s+16 apply to a lifecycle verb/i
+        /at minimum gates 1,\s+2,\s+3,\s+4,\s+5,\s+6,\s+7,\s+8,\s+9,\s+11,\s+12,\s+and\s+16 apply to a lifecycle verb/i
     )
 })
 
