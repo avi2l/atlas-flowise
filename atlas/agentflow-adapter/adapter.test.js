@@ -401,12 +401,26 @@ test('Phase 0 documentation defers NVIDIA NIM host installer and container contr
     )
 })
 
+function assertHostRuntimeAndStopGateDocumentation(source) {
+    assert.match(source, /must not receive a Docker daemon socket/i)
+    assert.match(source, /must not receive[^.]*host-runtime control/i)
+    assert.match(source, /requires\s+all\s+applicable\s+stop-gate\s+decisions/i)
+    assert.match(source, /at\s+minimum\s+gates\s+2,\s+3,\s+4,\s+5,\s+8,\s+9,\s+12,\s+and\s+16/i)
+    assert.doesNotMatch(source, /exclusion enforces the skeleton's separation/i)
+}
+
 test('Phase 0 documentation prohibits host-runtime control and scopes future adapter verbs to all applicable gates', () => {
-    assert.match(phaseZeroDocumentationSource, /must not receive a Docker daemon socket/i)
-    assert.match(phaseZeroDocumentationSource, /must not receive[^.]*host-runtime control/i)
-    assert.match(phaseZeroDocumentationSource, /requires all applicable\s+stop-gate decisions/i)
-    assert.match(phaseZeroDocumentationSource, /at minimum gates 2,\s+3, 4, 5, 8, 9, 12, and 16/i)
-    assert.doesNotMatch(phaseZeroDocumentationSource, /exclusion enforces the skeleton's separation/i)
+    assertHostRuntimeAndStopGateDocumentation(phaseZeroDocumentationSource)
+})
+
+test('Phase 0 stop-gate documentation guard tolerates prose reflow at every word boundary', () => {
+    const reflowedPolicy = phaseZeroDocumentationSource
+        .split('requires all applicable')
+        .join('requires\nall applicable')
+        .split('at minimum gates 2,')
+        .join('at\nminimum gates 2,')
+
+    assertHostRuntimeAndStopGateDocumentation(reflowedPolicy)
 })
 
 test('Phase 0 documentation defers the Flowise end-user embed surface to Atlas-owned UX', () => {
