@@ -195,7 +195,13 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
                 normalizedEntryName.startsWith('dockerfile.') ||
                 normalizedEntryName.startsWith('dockerfile-') ||
                 normalizedEntryName.endsWith('.dockerfile') ||
-                entry.name === 'Makefile' ||
+                normalizedEntryName === 'makefile' ||
+                normalizedEntryName === 'gnumakefile' ||
+                normalizedEntryName.startsWith('makefile.') ||
+                normalizedEntryName.startsWith('makefile-') ||
+                normalizedEntryName.startsWith('gnumakefile.') ||
+                normalizedEntryName.startsWith('gnumakefile-') ||
+                normalizedEntryName.endsWith('.makefile') ||
                 runtimeSourceExtensions.has(extension) ||
                 isBinEntryScript ||
                 isHuskyHook)
@@ -402,10 +408,10 @@ test('Phase 0 documentation defers NVIDIA NIM host installer and container contr
 })
 
 function assertHostRuntimeAndStopGateDocumentation(source) {
-    assert.match(source, /must not receive a Docker daemon socket/i)
-    assert.match(source, /must not receive[^.]*host-runtime control/i)
+    assert.match(source, /must\s+not\s+receive\s+a\s+Docker\s+daemon\s+socket/i)
+    assert.match(source, /must\s+not\s+receive[^.]*host-runtime\s+control/i)
     assert.match(source, /requires\s+all\s+applicable\s+stop-gate\s+decisions/i)
-    assert.match(source, /at\s+minimum\s+gates\s+2,\s+3,\s+4,\s+5,\s+8,\s+9,\s+12,\s+and\s+16/i)
+    assert.match(source, /at\s+minimum\s+gates\s+1,\s+2,\s+3,\s+4,\s+5,\s+8,\s+9,\s+12,\s+and\s+16/i)
     assert.doesNotMatch(source, /exclusion enforces the skeleton's separation/i)
 }
 
@@ -415,12 +421,23 @@ test('Phase 0 documentation prohibits host-runtime control and scopes future ada
 
 test('Phase 0 stop-gate documentation guard tolerates prose reflow at every word boundary', () => {
     const reflowedPolicy = phaseZeroDocumentationSource
+        .split('a Docker daemon socket')
+        .join('a Docker\ndaemon socket')
+        .split('host-runtime control')
+        .join('host-runtime\ncontrol')
         .split('requires all applicable')
         .join('requires\nall applicable')
-        .split('at minimum gates 2,')
-        .join('at\nminimum gates 2,')
+        .split('at minimum gates 1,')
+        .join('at\nminimum gates 1,')
 
     assertHostRuntimeAndStopGateDocumentation(reflowedPolicy)
+})
+
+test('Phase 0 lifecycle-verb documentation includes service authentication among its minimum gates', () => {
+    assert.match(
+        phaseZeroDocumentationSource,
+        /at minimum gates 1,\s+2,\s+3,\s+4,\s+5,\s+8,\s+9,\s+12,\s+and\s+16 apply to a lifecycle verb/i
+    )
 })
 
 test('Phase 0 documentation defers the Flowise end-user embed surface to Atlas-owned UX', () => {
@@ -616,6 +633,31 @@ test('runtime source collection includes Dockerfile variants and CommonJS TypeSc
             'Dockerfile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
             'worker.Dockerfile': 'COPY atlas/agentflow-adapter /boundary\n',
             'runtime.cts': "require('../../atlas/agentflow-adapter')\n"
+        }
+
+        for (const [name, source] of Object.entries(sourceByName)) {
+            fs.writeFileSync(path.join(fixtureDirectory, name), source)
+        }
+
+        const runtimeSources = collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+
+        assert.deepEqual(runtimeSources.map(({ name }) => name).sort(), Object.keys(sourceByName).sort())
+        assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources))
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes case and naming variants of Makefiles for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const sourceByName = {
+            makefile: 'COPY atlas/agentflow-adapter /boundary\n',
+            GNUmakefile: 'COPY atlas/agentflow-adapter /boundary\n',
+            'GNUmakefile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'Makefile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'production.makefile': 'COPY atlas/agentflow-adapter /boundary\n'
         }
 
         for (const [name, source] of Object.entries(sourceByName)) {

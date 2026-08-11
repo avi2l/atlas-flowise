@@ -244,8 +244,8 @@ Its only behavior is fail-closed:
 No request shape is accepted. It defines no Atlas credential, actor, permission,
 data, or transport protocol. The closed surface is a deliberate tripwire, not a
 production lifecycle contract: any additional verb requires all applicable
-stop-gate decisions and an explicit contract-test change; at minimum gates 2,
-3, 4, 5, 8, 9, 12, and 16 apply to a lifecycle verb.
+stop-gate decisions and an explicit contract-test change; at minimum gates 1,
+2, 3, 4, 5, 8, 9, 12, and 16 apply to a lifecycle verb.
 
 ## Security-sensitive decisions deferred (stop gates)
 
@@ -319,7 +319,8 @@ Do **not** implement a transport until Atlas approves all of the following:
     on-call ownership for the contained Flowise dependency and its ingress must
     be assigned. The Atlas boundary must also define outage behavior,
     idempotency, and duplicate-execution handling before it submits a run.
-18. Host-runtime control: Flowise must not receive a Docker daemon socket,
+18. Host-runtime privilege posture: Atlas must decide and document a
+    default-deny posture: Flowise must not receive a Docker daemon socket,
     host-runtime control, or installer privileges. Any exception requires a
     separately documented Atlas security decision and deployment-containment
     review; the presence of a Flowise route is not an authorization to grant it.
