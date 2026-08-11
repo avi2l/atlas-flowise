@@ -57,7 +57,7 @@ const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'u
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeRootDirectory = path.join(__dirname, '../..')
 const rootFlowiseRuntimeIgnoredDirectories = ['atlas', 'docs']
-const nestedFlowiseRuntimeIgnoredDirectories = ['.git', '.turbo', 'build', 'dist', 'node_modules']
+const nestedFlowiseRuntimeIgnoredDirectories = ['.git', '.turbo', 'node_modules']
 const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
 const expectedAdapterWorkflowSource = [
     'name: Atlas AgentFlow Adapter Boundary',
@@ -965,6 +965,30 @@ test('Flowise containment discovery scans new top-level runtime directories', ()
         assert.ok(
             collectFlowiseRuntimeSources(fixtureDirectory).some(({ name }) => name === 'new-runtime/deploy.ps1'),
             'New top-level runtime directories must be included in containment scanning.'
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('Flowise containment discovery scans runtime artifacts in nested build and dist directories', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+    const runtimeDirectories = ['build', 'dist'].map((directory) => path.join(fixtureDirectory, 'new-runtime', directory))
+
+    try {
+        for (const runtimeDirectory of runtimeDirectories) {
+            fs.mkdirSync(runtimeDirectory, { recursive: true })
+            fs.writeFileSync(path.join(runtimeDirectory, 'bridge.js'), "require('../../atlas/agentflow-adapter')\n")
+        }
+
+        const runtimeSourceNames = collectFlowiseRuntimeSources(fixtureDirectory).map(({ name }) => name)
+        assert.ok(
+            runtimeSourceNames.includes('new-runtime/build/bridge.js'),
+            'Nested build artifacts must be included in containment scanning.'
+        )
+        assert.ok(
+            runtimeSourceNames.includes('new-runtime/dist/bridge.js'),
+            'Nested dist artifacts must be included in containment scanning.'
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
