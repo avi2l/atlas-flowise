@@ -824,6 +824,10 @@ test('Phase 0 documentation uses the same explicit adapter test command as CI', 
     assert.doesNotMatch(phaseZeroDocumentationSource, /node --test atlas\/agentflow-adapter\/\*\.test\.js/)
 })
 
+test('Phase 0 adapter contract section contains no orphaned transport assertion', () => {
+    assert.doesNotMatch(phaseZeroDocumentationSource, /^future seam without defining an Atlas credential/m)
+})
+
 test('Phase 0 documentation defers tenancy, erasure, resource, and queue containment decisions', () => {
     assert.match(phaseZeroDocumentationSource, /shared Flowise instance/i)
     assert.match(phaseZeroDocumentationSource, /erasure/i)

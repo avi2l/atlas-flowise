@@ -245,8 +245,6 @@ No request shape is accepted. The closed surface is a deliberate tripwire, not a
 production lifecycle contract: any additional verb requires all applicable
 stop-gate decisions and an explicit contract-test change; at minimum gates 2,
 3, 4, 5, 8, 9, 12, and 16 apply to a lifecycle verb.
-future seam without defining an Atlas credential, actor, permission, data, or
-transport protocol.
 
 ## Security-sensitive decisions deferred (stop gates)
 
