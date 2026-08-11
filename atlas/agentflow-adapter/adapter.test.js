@@ -838,7 +838,8 @@ test('Phase 0 documentation uses the same explicit adapter test command as CI', 
     assert.doesNotMatch(phaseZeroDocumentationSource, /node --test atlas\/agentflow-adapter\/\*\.test\.js/)
 })
 
-test('Phase 0 adapter contract section contains no orphaned transport assertion', () => {
+test('Phase 0 adapter contract documents that its closed surface defines no Atlas protocol', () => {
+    assert.match(phaseZeroDocumentationSource, /It defines no Atlas credential, actor, permission,\s+data, or transport protocol\./)
     assert.doesNotMatch(phaseZeroDocumentationSource, /^future seam without defining an Atlas credential/m)
 })
 
