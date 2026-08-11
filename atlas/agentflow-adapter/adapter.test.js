@@ -175,9 +175,11 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
         const extension = path.extname(entry.name).toLowerCase()
         const normalizedEntryName = entry.name.toLowerCase()
         const entryParent = path.relative(rootDirectory, path.dirname(entryPath))
-        const isBinEntryScript = entryParent.split(path.sep).includes('bin') && (extension === '' || extension === '.cmd')
+        const normalizedEntryParent = entryParent.toLowerCase()
+        const normalizedRootName = path.basename(rootDirectory).toLowerCase()
+        const isBinEntryScript = normalizedEntryParent.split(path.sep).includes('bin') && (extension === '' || extension === '.cmd')
         const isHuskyHook =
-            (entryParent === '.husky' || (path.basename(rootDirectory) === '.husky' && entryParent === '')) && extension === ''
+            (normalizedEntryParent === '.husky' || (normalizedRootName === '.husky' && normalizedEntryParent === '')) && extension === ''
 
         const entryRelativePath = path.relative(rootDirectory, entryPath)
         const isIgnoredRootDirectory = entryRelativePath === entry.name && rootFlowiseRuntimeIgnoredDirectories.includes(entry.name)
@@ -425,7 +427,10 @@ function assertHostRuntimeAndStopGateDocumentation(source) {
     assert.match(source, /must\s+not\s+receive\s+a\s+Docker\s+daemon\s+socket/i)
     assert.match(source, /must\s+not\s+receive[^.]*host-runtime\s+control/i)
     assert.match(source, /requires\s+all\s+applicable\s+stop-gate\s+decisions/i)
-    assert.match(source, /at\s+minimum\s+gates\s+1,\s+2,\s+3,\s+4,\s+5,\s+6,\s+7,\s+8,\s+9,\s+11,\s+12,\s+16,\s+and\s+17/i)
+    assert.match(
+        source,
+        /at\s+minimum\s+gates\s+1,\s+2,\s+3,\s+4,\s+5,\s+6,\s+7,\s+8,\s+9,\s+11,\s+12,\s+13,\s+15,\s+16,\s+17,\s+and\s+18/i
+    )
     assert.doesNotMatch(source, /exclusion enforces the skeleton's separation/i)
 }
 
@@ -450,7 +455,7 @@ test('Phase 0 stop-gate documentation guard tolerates prose reflow at every word
 test('Phase 0 lifecycle-verb documentation includes every minimum security gate', () => {
     assert.match(
         phaseZeroDocumentationSource,
-        /at minimum gates 1,\s+2,\s+3,\s+4,\s+5,\s+6,\s+7,\s+8,\s+9,\s+11,\s+12,\s+16,\s+and\s+17 apply to a lifecycle verb/i
+        /at minimum gates 1,\s+2,\s+3,\s+4,\s+5,\s+6,\s+7,\s+8,\s+9,\s+11,\s+12,\s+13,\s+15,\s+16,\s+17,\s+and\s+18 apply to a lifecycle\s+verb/i
     )
 })
 
@@ -578,6 +583,28 @@ test('runtime source collection includes nested extensionless bin entry scripts 
                 .map(({ name }) => name)
                 .sort(),
             ['packages/server/bin/dev', 'packages/server/bin/run']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes case-varied bin and Husky entry scripts for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const binDirectory = path.join(fixtureDirectory, 'Bin')
+        const huskyDirectory = path.join(fixtureDirectory, '.Husky')
+        fs.mkdirSync(binDirectory)
+        fs.mkdirSync(huskyDirectory)
+        fs.writeFileSync(path.join(binDirectory, 'run'), "#!/usr/bin/env node\nrequire('../../atlas/agentflow-adapter/adapter')\n")
+        fs.writeFileSync(path.join(huskyDirectory, 'pre-commit'), '#!/usr/bin/env sh\nnode atlas/agentflow-adapter/adapter.js\n')
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['.Husky/pre-commit', 'Bin/run']
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
