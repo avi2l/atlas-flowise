@@ -82,9 +82,19 @@ The first Atlas work in this fork is limited to compatibility reconnaissance and
 an integration boundary. Do not import Atlas credentials, project records, or
 production data into this repository.
 
+## Modified upstream-file inventory
+
+Phase 0 modifies only the pinned upstream `.dockerignore`, adding exclusions for
+Git metadata and the non-production Phase-0 reconnaissance/adapter artifacts.
+The change keeps the root image build context from carrying the Atlas boundary;
+it does not authorize building, publishing, or deploying an Atlas image. All
+other Phase-0 files are newly added Atlas artifacts. This inventory is a
+technical record for the Apache-2.0 modified-file notice obligation described
+below and must be updated for any subsequent change to an inherited file.
+
 ## License review note
 
-This repository is based on the Apache 2.0 release identified above. Before any
+This repository is based on the Apache 2.0 release identified above.
 future upgrade, re-check the exact tag's `LICENSE.md`, third-party notices, and
 all paths proposed for reuse. Before any redistribution of this fork or an
 Atlas-built image, include a copy of the Apache-2.0 license, retain the
