@@ -2,6 +2,8 @@
 
 **Status:** reconnaissance complete; adapter remains deliberately disabled.
 **Scope:** Flowise `2.2.7`, pinned at `cf7d841f88504bba465790eb906f6d758b91ee2c`.
+Every Flowise behavior and authentication finding below applies only to that
+pinned tree, not to the separate `main` line.
 No upstream synchronization, package upgrade, external deployment, credential
 import, production-data access, database change, or identity/security architecture
 change was performed. Inherited repository CI can start local Flowise and Docker
@@ -26,15 +28,37 @@ gates below are additional constraints, not a path to make `main` approved.
 
 ## Compatibility findings
 
-| Area                       | Observation in the pinned tree                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Integration consequence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| AgentFlow model            | `packages/server/src/utils/buildChatflow.ts` uses `MULTIAGENT` for one AgentFlow classification path, while execution can also select `buildAgentGraph.ts` from ending-node categories.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Atlas must treat the pinned runtime as an isolated workflow/canvas engine, not as the system of record. A future allow-list or routing rule cannot rely on the chatflow type alone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| AgentFlow discovery and UI | `packages/server/src/services/chatflows/index.ts` and `packages/ui/src/api/chatflows.js` query `MULTIAGENT`; Flowise exposes its own `/agentflows` UI in `packages/ui/src/views/agentflows/index.jsx`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | The Flowise UI has no Atlas context. Do not embed or expose it as an Atlas endpoint in Phase 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Runtime authentication     | `packages/server/src/index.ts` enables one global Basic Auth user only when both `FLOWISE_USERNAME` and `FLOWISE_PASSWORD` are configured. A client-settable `x-request-from: internal` header bypasses API-key validation when Basic Auth is absent; with Basic Auth configured, it selects Basic Auth instead. `WHITELIST_URLS` contains 20 unauthenticated `/api/v1` prefixes (including public flow/config, prediction, uploads, feedback, leads, and metrics), matched with `req.path.startsWith`; all non-`/api/v1` paths (including the UI and canvas) also bypass this middleware. When `MODE=queue`, `/admin/queues` mounts Bull Board without an authentication wrapper, exposing queue administration outside this middleware. `CORS_ORIGINS` and `IFRAME_ORIGINS` both default to `*`. | Flowise does not provide Atlas actor, tenant, project, or authorization enforcement. The contained deployment boundary and Atlas-owned authorization layer are mandatory; Flowise must never be directly exposed to Atlas clients. A future private ingress must strip client-supplied `x-request-from`, deny direct public/UI and `/admin/queues` access, restrict browser origins and framing rather than relying on the `*` defaults, normalize or reject traversal and encoded path forms before applying any allow-list, and explicitly handle the complete prefix allow-list.                                                                                                                                                                                                                                                                          |
-| Execution data             | `buildChatflow.ts` creates/stores chat messages and sends AgentFlow telemetry. Flowise telemetry is enabled unless `DISABLE_FLOWISE_TELEMETRY=true`. The pinned tool catalog includes custom tools, code-interpreter, filesystem, HTTP, and MCP capabilities. The inherited `main.yml` starts Flowise for Cypress without setting `DISABLE_FLOWISE_TELEMETRY`; `main.yml` and `test_docker_build.yml` run for pull requests only when the base branch name contains no slash (their `'*'` filter) and pushes to `main`.                                                                                                                                                                                                                                                                            | Atlas project, actor, assignment, review, governance, and event-outbox records must remain outside Flowise, as required by `ATLAS_UPSTREAM.md`. No Flowise instance or adapter transport runtime was started locally for this Phase-0 work; the disabled module is exercised only in-process by its contract test. A PR targeting the slash-containing pinned baseline does not match those inherited PR triggers; a PR targeting an un-slashed branch, or pushing/merging to `main`, would start the inherited localhost Flowise process (and the inherited Docker build) without Atlas credentials or production data, but with Flowise's default telemetry posture. Changing that inherited CI behavior is a separate GitHub Actions and telemetry security decision; do not target an un-slashed branch or merge this branch to `main` until it is made. |
-| Container packaging        | The root `Dockerfile` builds this pinned source tree and excludes `atlas/` through `.dockerignore`. Separately, inherited `docker/Dockerfile` installs unversioned latest `flowise` from npm and the inherited `docker-image.yml` can publish that image to the upstream `flowiseai/flowise` namespace. The inherited `docker/docker-compose.yml` and `docker/worker/docker-compose.yml` use `flowiseai/*:latest`, publish the configured port to the host, and bind-mount `~/.flowise`; `docker/README.md` presents `docker compose up -d` and `http://localhost:3000` before its optional Basic Auth instructions.                                                                                                                                                                               | The inherited Dockerfiles and compose examples are not evidence of the audited `2.2.7`/`cf7d841` runtime and are not authorized for Atlas use. Selecting, pinning, publishing, or deploying any Atlas runtime image requires a separate supply-chain and deployment-containment decision; this Phase-0 work did not run or change those paths. In particular, do not use the compose examples for an Atlas environment: their host exposure, unpinned images, persistence mount, and optional-auth posture violate the required contained runtime boundary.                                                                                                                                                                                                                                                                                                  |
-| Example content            | `packages/server/marketplaces/agentflows/` contains example flow JSON.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Examples are reconnaissance material only; no marketplace flow or production data is imported into the adapter.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| License/pin                | `ATLAS_UPSTREAM.md` records Apache 2.0 for this exact release and forbids automatic upstream sync.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Any future upstream change requires the recorded per-change license/security/API review; no later enterprise/commercial code may be copied.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Area                       | Observation in the pinned tree                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Integration consequence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AgentFlow model            | `packages/server/src/utils/buildChatflow.ts` uses `MULTIAGENT` for one AgentFlow classification path, while execution can also select `buildAgentGraph.ts` from ending-node categories.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Atlas must treat the pinned runtime as an isolated workflow/canvas engine, not as the system of record. A future allow-list or routing rule cannot rely on the chatflow type alone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| AgentFlow discovery and UI | `packages/server/src/services/chatflows/index.ts` and `packages/ui/src/api/chatflows.js` query `MULTIAGENT`; Flowise exposes its own `/agentflows` UI in `packages/ui/src/views/agentflows/index.jsx`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | The Flowise UI has no Atlas context. Do not embed or expose it as an Atlas endpoint in Phase 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Runtime authentication     | `packages/server/src/index.ts` enables one global Basic Auth user only when both `FLOWISE_USERNAME` and `FLOWISE_PASSWORD` are configured. A client-settable `x-request-from: internal` header bypasses API-key validation when Basic Auth is absent; with Basic Auth configured, it selects Basic Auth instead. `WHITELIST_URLS` contains 20 unauthenticated `/api/v1` prefixes (including public flow/config, prediction, uploads, feedback, leads, and metrics), matched with `req.path.startsWith`; that whitelist bypass is unconditional in both Basic-Auth branches. All non-`/api/v1` paths (including the UI and canvas) also bypass this middleware. When `MODE=queue`, `/admin/queues` mounts Bull Board without an authentication wrapper, exposing queue administration outside this middleware. `CORS_ORIGINS` and `IFRAME_ORIGINS` both default to `*`. | Flowise does not provide Atlas actor, tenant, project, or authorization enforcement. Basic Auth does not protect the whitelisted routes. The contained deployment boundary and Atlas-owned authorization layer are mandatory; Flowise must never be directly exposed to Atlas clients. A future private ingress must strip client-supplied `x-request-from`, deny direct public/UI and `/admin/queues` access, restrict browser origins and framing rather than relying on the `*` defaults, normalize or reject traversal and encoded path forms before applying any allow-list, and explicitly handle the complete prefix allow-list.                                                                                                                                                                                                                      |
+| Execution data             | `buildChatflow.ts` creates/stores chat messages and sends AgentFlow telemetry. Flowise telemetry is enabled unless `DISABLE_FLOWISE_TELEMETRY=true`. The pinned tool catalog includes custom tools, code-interpreter, filesystem, HTTP, and MCP capabilities. The inherited `main.yml` starts Flowise for Cypress without setting `DISABLE_FLOWISE_TELEMETRY`; `main.yml` and `test_docker_build.yml` run for pull requests only when the base branch name contains no slash (their `'*'` filter) and pushes to `main`.                                                                                                                                                                                                                                                                                                                                                | Atlas project, actor, assignment, review, governance, and event-outbox records must remain outside Flowise, as required by `ATLAS_UPSTREAM.md`. No Flowise instance or adapter transport runtime was started locally for this Phase-0 work; the disabled module is exercised only in-process by its contract test. A PR targeting the slash-containing pinned baseline does not match those inherited PR triggers; a PR targeting an un-slashed branch, or pushing/merging to `main`, would start the inherited localhost Flowise process (and the inherited Docker build) without Atlas credentials or production data, but with Flowise's default telemetry posture. Changing that inherited CI behavior is a separate GitHub Actions and telemetry security decision; do not target an un-slashed branch or merge this branch to `main` until it is made. |
+| Container packaging        | The root `Dockerfile` builds this pinned source tree and excludes `atlas/` through `.dockerignore`. Separately, inherited `docker/Dockerfile` installs unversioned latest `flowise` from npm and the inherited `docker-image.yml` can publish that image to the upstream `flowiseai/flowise` namespace. The inherited `docker/docker-compose.yml` and `docker/worker/docker-compose.yml` use `flowiseai/*:latest`, publish the configured port to the host, and bind-mount `~/.flowise`; `docker/README.md` presents `docker compose up -d` and `http://localhost:3000` before its optional Basic Auth instructions.                                                                                                                                                                                                                                                   | The inherited Dockerfiles and compose examples are not evidence of the audited `2.2.7`/`cf7d841` runtime and are not authorized for Atlas use. Selecting, pinning, publishing, or deploying any Atlas runtime image requires a separate supply-chain and deployment-containment decision; this Phase-0 work did not run or change those paths. In particular, do not use the compose examples for an Atlas environment: their host exposure, unpinned images, persistence mount, and optional-auth posture violate the required contained runtime boundary.                                                                                                                                                                                                                                                                                                  |
+| Example content            | `packages/server/marketplaces/agentflows/` contains example flow JSON.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Examples are reconnaissance material only; no marketplace flow or production data is imported into the adapter.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| License/pin                | `ATLAS_UPSTREAM.md` records Apache 2.0 for this exact release and forbids automatic upstream sync.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Any future upstream change requires the recorded per-change license/security/API review; no later enterprise/commercial code may be copied.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+
+## Critical compatibility containment findings
+
+-   `main` is **not an approved Atlas baseline**. Its disposition requires an
+    explicit owner decision; do not merge it or use it as an Atlas base.
+-   `/api/v1/export-import` accepts the client-settable `x-request-from: internal`
+    path without an API key when Basic Auth is absent. It is an
+    instance-administration/data-egress surface, not a tenant-safe integration API.
+-   With `MODE=queue`, `/admin/queues` exposes Bull Board queue administration
+    outside the authentication middleware. A contained deployment must deny direct
+    access; queue mode remains a stop-gate decision.
+-   `CORS_ORIGINS` and `IFRAME_ORIGINS` both default to `*`. A future contained
+    ingress must restrict browser origins and framing; these defaults are not an
+    Atlas security control.
+-   The public prefixes `/api/v1/vector/upsert`, `/api/v1/leads`,
+    `/api/v1/get-upload-file`, `/api/v1/openai-assistants-file/download`, and
+    `/api/v1/nvidia-nim` include sensitive write, data-egress, and host-control
+    surfaces. A future ingress must deny public access and make an explicit,
+    version-specific decision for every Flowise path.
+-   Flowise must not receive a Docker daemon socket, host-runtime control, or
+    installer privileges. Any exception requires a separate Atlas security and
+    deployment-containment decision.
 
 ## Service boundary
 
@@ -56,6 +80,16 @@ Isolated pinned Flowise 2.2.7 runtime
   - does not become an Atlas identity or authorization authority
 ```
 
+In its default posture, the pinned release is effectively unauthenticated for
+Atlas purposes: a client-controlled header bypasses its API-key middleware, the
+20 whitelisted prefixes bypass it whether or not Basic Auth is configured, and
+the UI/canvas and queue administration sit outside that middleware. Network
+containment alone is insufficient where a browser or other untrusted client can
+reach the instance, especially given the permissive browser defaults and
+state-changing unauthenticated routes. An approved private ingress and
+Atlas-owned authorization layer are required; Flowise authentication is never
+an Atlas security control.
+
 ### Ownership invariants
 
 1. Flowise is never directly exposed to Atlas clients.
@@ -65,7 +99,9 @@ Isolated pinned Flowise 2.2.7 runtime
 3. Atlas owns the external run lifecycle and audit record; Flowise is an
    isolated runtime dependency only.
 4. A Flowise execution identifier is an opaque runtime reference, not an Atlas
-   actor, project, permission, or authorization claim.
+   actor, project, permission, or authorization claim; it is also sensitive
+   capability data and must not be exposed, logged, or accepted as client-run
+   scope.
 5. Flowise responses, tool results, streamed chunks, artifact references, and
    errors are untrusted input at the Atlas boundary. They must be validated and
    bounded by Atlas and cannot become trusted markup, domain records, or
@@ -82,13 +118,17 @@ Isolated pinned Flowise 2.2.7 runtime
 8. Flowise persistent state, uploads, and backups are separate contained data
    paths. They must not be co-located with or share credentials with any Atlas
    datastore.
+9. Atlas terminates and re-authors every request at its boundary. It never acts
+   as a pass-through proxy for caller-supplied Flowise headers, `chatId`,
+   `overrideConfig`, node inputs, credential references, uploads, or responses.
 
 ## Unauthenticated-prefix reconnaissance
 
 In the pinned release, `WHITELIST_URLS` is checked with `req.path.startsWith`.
 The following are the complete 20 unauthenticated `/api/v1` prefixes recorded
-from `packages/server/src/utils/constants.ts`; they are not an allow-list for a
-future Atlas ingress:
+from `packages/server/src/utils/constants.ts`. They are a subset of the broader
+internal-header exposure described below, not an allow-list for a future Atlas
+ingress:
 
 ```text
 /api/v1/verify/apikey/                 /api/v1/chatflows/apikey/
@@ -107,10 +147,16 @@ In particular, this includes unauthenticated vector-store write
 (`vector/upsert`), which is a prompt-injection ingress risk when a flow later
 retrieves that store; file egress (`get-upload-file` and
 `openai-assistants-file/download`); and unauthenticated lead reads that can
-return captured PII (`leads`). Entries without a trailing slash are still
-prefixes, not exact-route matches. Any future private ingress must deny public
-access and make an explicit, version-specific decision for every path; this
-record does not authorize any of them.
+return captured PII (`leads`). Unauthenticated `/api/v1/nvidia-nim` is a host
+installer and container control risk: its routes can download/run the NVIDIA
+installer and accept caller-controlled image tags for image pull and container
+start operations. Its token-mint route also makes an outbound NVIDIA request.
+The containment decision is deferred: Phase 0 neither enables these routes nor
+authorizes a Flowise runtime with Docker socket, host-runtime, or installer
+control. Entries without a trailing slash are still prefixes, not exact-route
+matches. Any future private ingress must deny public access and make an
+explicit, version-specific decision for every path; this record does not
+authorize any of them.
 
 ## Execution, instance-export, and end-user UX boundaries
 
@@ -122,12 +168,32 @@ these endpoints and independently authorize every flow invocation; Flowise
 `apikeyid`, `isPublic`, chat ID, and allowed-origin fields are untrusted runtime
 configuration, not Atlas claims.
 
-`/api/v1/export-import` is API-key-gated rather than whitelisted, but its API
-key is instance-global and can read or write the instance's flows, agentflows,
-tools, variables, and assistants. A future contained transport must not expose
-this endpoint or grant its credential based on Atlas tenant or project access.
-It is an instance-administration and data-egress boundary, not a tenant-safe
-integration API.
+`/api/v1/export-import` is not whitelisted, but it is not reliably API-key
+gated in the default posture: when Basic Auth is absent, a client-settable
+`x-request-from: internal` header reaches this endpoint without an API key. If
+an API key is evaluated, it is instance-global and can read or write the
+instance's flows, agentflows, tools, variables, and assistants. A future
+contained transport must not expose this endpoint or grant an instance
+credential based on Atlas tenant or project access. It is an
+instance-administration and data-egress boundary, not a tenant-safe integration
+API.
+
+This header bypass applies to the entire non-whitelisted `/api/v1` surface, not
+only the routes named here. For example, `GET /api/v1/credentials/:id` returns a
+decrypted `plainDataObj`. Credential, variable, and API-key administration are
+therefore maximal exposure cases, not tenant-safe integration APIs.
+
+The same header reaches non-whitelisted internal execution paths when Basic Auth
+is absent. `/api/v1/internal-prediction` invokes Flowise's internal build path,
+which bypasses the per-flow API-key and allowed-origin checks; its streaming
+path also accepts a supplied `chatId` before validation. `/api/v1/vector/internal-upsert/:id`
+uses the corresponding internal vector-upsert path. These routes are not
+tenant-safe alternatives to the public routes, and a bound Flowise flow API key
+or allowed origin is not a defense against them. A future private ingress must
+strip client-supplied `x-request-from` and deny direct access to both internal
+and public Flowise execution routes; no transport is authorized by this record.
+`internal-prediction` and `internal-upsert` also do not apply Flowise's external
+rate-limit middleware, so Atlas and private ingress must own rate limiting.
 
 Flowise's end-user **Flowise embed** widget is also out of scope. Its generated
 snippet loads an unpinned third-party CDN asset and uses Flowise public-chatflow
@@ -176,11 +242,12 @@ relying on it as an ingress control.
 ## Repository-automation reconnaissance
 
 As observed on 2026-08-06, `avi2l/atlas-flowise` has no repository Actions
-secrets configured and its `main` branch has no branch-protection rule. This
-means no repository-scoped secrets were configured at the time of this check,
-but it does not establish the absence of organization-level or environment-level
-secrets. The lack of branch protection leaves their `main` triggers governed
-only by process.
+secrets configured. This means no repository-scoped secrets were configured at
+the time of this check. This finding does not establish the absence of
+organization-level or environment-level secrets. As verified on 2026-08-10,
+neither `main` nor `atlas/pinned-flowise-2.2.7` has a branch-protection rule.
+The lack of branch protection leaves their triggers and the pinned-baseline
+containment controls governed only by process.
 `autoSyncSingleCommit.yml` and `autoSyncMergedPullRequest.yml` dispatch commit
 or pull-request metadata to the repository named by `AUTOSYNC_CH_URL` when
 `AUTOSYNC_*` secrets are later added; the latter also uses
@@ -204,8 +271,14 @@ Its only behavior is fail-closed:
 -   The rejected error identifies only the attempted operation (`run` or
     `abort`); it carries no request data.
 
-No request shape is accepted. This establishes a minimal future seam without
-defining an Atlas credential, actor, permission, data, or transport protocol.
+No request shape is accepted. It defines no Atlas credential, actor, permission,
+data, or transport protocol. `run` and `abort` are placeholder tripwire names,
+not approved lifecycle semantics; they are equally subject to the stop gates,
+including authorization and cancellation decisions. The closed surface is a
+deliberate tripwire, not a production lifecycle contract: any additional verb
+requires all applicable stop-gate decisions and an explicit contract-test
+change; at minimum gates 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+16, 17, and 18 apply to a lifecycle verb.
 
 ## Security-sensitive decisions deferred (stop gates)
 
@@ -218,8 +291,10 @@ Do **not** implement a transport until Atlas approves all of the following:
    supplied by a client cannot be trusted or forwarded as an Atlas run scope.
 3. Deployment containment: private network boundary, ingress policy, and
    operational ownership of the isolated Flowise runtime. The ingress must
-   strip client-supplied `x-request-from`, deny public/UI and `/admin/queues`
-   access, normalize or reject traversal and encoded path forms before applying
+   terminate and re-mint all client-supplied authentication and identity headers
+   (`Authorization`, `x-request-from`, and cookies), and forward only an
+   Atlas-generated allow-list of headers to Flowise. It must deny public/UI and `/admin/queues` access, normalize
+   or reject traversal and encoded path forms before applying
    any allow-list, and explicitly handle the complete Flowise prefix allow-list
    before any transport exists.
 4. Run lifecycle semantics, especially cancellation and human-in-the-loop
@@ -277,6 +352,11 @@ Do **not** implement a transport until Atlas approves all of the following:
     on-call ownership for the contained Flowise dependency and its ingress must
     be assigned. The Atlas boundary must also define outage behavior,
     idempotency, and duplicate-execution handling before it submits a run.
+18. Host-runtime privilege posture: Atlas must decide and document a
+    default-deny posture: Flowise must not receive a Docker daemon socket,
+    host-runtime control, or installer privileges. Any exception requires a
+    separately documented Atlas security decision and deployment-containment
+    review; the presence of a Flowise route is not an authorization to grant it.
 
 These are architecture decisions with security impact. Their absence is why
 this Phase-0 adapter stays disabled. The inherited repository-dispatch and
@@ -302,19 +382,23 @@ node --test atlas/agentflow-adapter/adapter.test.js
 
 The standalone `Atlas AgentFlow Adapter Boundary` workflow is constrained by
 this contract test to its single Node 20 contract step, without installing or
-starting Flowise. It runs only for pushes to, and pull requests whose base is,
-the slash-containing pinned baseline (`atlas/pinned-flowise-2.2.7`); that slash
-does not match the inherited PR workflows' slash-free base filter. Do not target
-an un-slashed base or merge this branch to `main`, because either path can start
-inherited Flowise work with its default telemetry posture until the separate CI
-and telemetry security decision is recorded. The contract also protects the root
+starting Flowise. It runs for pushes to the slash-containing pinned baseline
+(`atlas/pinned-flowise-2.2.7`) and for pull requests targeting any base branch;
+the latter coverage provides the same containment check when a proposed branch
+is incorrectly targeted at an un-slashed base. This is a
+regression check, not an enforcement boundary against an adversarial edit: the
+workflow and its test execute from the proposed revision, and the pinned
+baseline has no branch-protection rule. Do not target an un-slashed base or merge
+this branch to `main`, because either path can start inherited Flowise work with
+its default telemetry posture until the separate CI and telemetry security
+decision is recorded. The contract also regression-checks the root
 container-build exclusion for `atlas/`. The separate inherited `docker/Dockerfile`
 is built with the repository context, which is also subject to `.dockerignore`,
 but it does not copy repository files into its image. The inherited standard
 Flowise CI workflow was intentionally left unchanged to avoid coupling this
-isolated check to a full Flowise dependency installation. The `atlas/` directory
-is excluded from Flowise container build contexts, preserving the skeleton's
-separation from Flowise runtime images.
+isolated check to a full Flowise dependency installation. The root build's
+`atlas/` exclusion is a regression-checked build-context separation, not a
+guarantee against a future Dockerfile or ignore-rule change.
 
 The repository-wide Flowise build was not treated as a release signal in this
 Phase-0 change: the local environment has Node `24.14.0`, while the pinned

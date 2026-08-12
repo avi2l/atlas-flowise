@@ -7,6 +7,8 @@
 -   **Pinned release:** `flowise@2.2.7`
 -   **Pinned commit:** `cf7d841f88504bba465790eb906f6d758b91ee2c`
 -   **Baseline branch:** `atlas/pinned-flowise-2.2.7`
+-   **Baseline protection:** no branch-protection rule as verified on 2026-08-10;
+    this pin is governed by process, not a GitHub enforcement control.
 -   **Pinned on:** 2026-08-03
 
 ### Main-branch containment
@@ -31,12 +33,16 @@ than following upstream `main` automatically.
 ## Fork policy
 
 1. Do not merge or sync upstream automatically.
-2. Evaluate upstream fixes one at a time for security, license, API compatibility,
+2. `main` must not be used as an Atlas merge target: it tracks Flowise `3.1.4`,
+   whose license identifies a commercial-license boundary outside the pinned
+   Apache-2.0 baseline. Atlas work must target the recorded pinned baseline or a
+   separately approved descendant of it.
+3. Evaluate upstream fixes one at a time for security, license, API compatibility,
    and Atlas product fit.
-3. Keep Atlas project, actor, assignment, review, event-outbox, and governance
+4. Keep Atlas project, actor, assignment, review, event-outbox, and governance
    records outside Flowise's database in the separate AgentFlow service.
-4. Treat Flowise as an isolated workflow/canvas runtime behind Atlas-owned APIs.
-5. Record every accepted upstream cherry-pick in this file with source commit,
+5. Treat Flowise as an isolated workflow/canvas runtime behind Atlas-owned APIs.
+6. Record every accepted upstream cherry-pick in this file with source commit,
    rationale, and license review.
 
 ## Inherited automation review gate
@@ -76,11 +82,34 @@ The first Atlas work in this fork is limited to compatibility reconnaissance and
 an integration boundary. Do not import Atlas credentials, project records, or
 production data into this repository.
 
+## Modified upstream-file inventory
+
+Phase 0 modifies only the pinned upstream `.dockerignore`, adding exclusions for
+Git metadata and the non-production Phase-0 reconnaissance/adapter artifacts.
+The change keeps the root image build context from carrying the Atlas boundary;
+it does not authorize building, publishing, or deploying an Atlas image. All
+other Phase-0 files are newly added Atlas artifacts. This inventory is a
+technical record for the Apache-2.0 modified-file notice obligation described
+below and must be updated for any subsequent change to an inherited file.
+
 ## License review note
 
 This repository is based on the Apache 2.0 release identified above. Before any
 future upgrade, re-check the exact tag's `LICENSE.md`, third-party notices, and
-all paths proposed for reuse. This is an engineering record, not legal advice.
+all paths proposed for reuse. Before any redistribution of this fork or an
+Atlas-built image, include a copy of the Apache-2.0 license, retain the
+applicable copyright, patent, trademark, and attribution notices, and carry
+prominent notices stating that modified files have been changed. Reproduce any
+upstream `NOTICE` file; no upstream NOTICE file is present at `cf7d841`. This is
+an engineering record, not legal advice. Apache-2.0 does not grant trademark
+rights; any use of Flowise names or marks requires a separate review.
+
+The Phase-0 `.dockerignore` intentionally keeps this inventory and other Atlas
+reconnaissance artifacts out of the inherited root image build context. Before
+any Atlas-built image is distributed, the deferred supply-chain decision must
+provide the required Apache-2.0 modified-file notice and applicable attribution
+outside that excluded context. This is not authorization to build, publish, or
+deploy an image.
 
 ## Upstream remotes
 

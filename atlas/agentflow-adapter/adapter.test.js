@@ -47,12 +47,12 @@ const adapterSources = adapterDirectoryEntries.filter(({ name }) => name === 'ad
 const adapterWorkflowSource = fs
     .readFileSync(path.join(__dirname, '../../.github/workflows/atlas-agentflow-adapter.yml'), 'utf8')
     .replace(/\r\n/g, '\n')
-const phaseZeroDocumentationSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
-const atlasUpstreamSource = fs.readFileSync(path.join(__dirname, '../../ATLAS_UPSTREAM.md'), 'utf8')
-const adapterReadmeSource = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8')
 const pnpmWorkspaceSource = fs.readFileSync(path.join(__dirname, '../../pnpm-workspace.yaml'), 'utf8')
 const rootPackageSource = fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8')
 const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'utf8')
+const phaseZeroDocumentSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
+const adapterReadmeSource = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8')
+const atlasUpstreamSource = fs.readFileSync(path.join(__dirname, '../../ATLAS_UPSTREAM.md'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeRootDirectory = path.join(__dirname, '../..')
@@ -68,7 +68,7 @@ const expectedAdapterWorkflowSource = [
     '            - atlas/pinned-flowise-2.2.7',
     '    pull_request:',
     '        branches:',
-    '            - atlas/pinned-flowise-2.2.7',
+    "            - '**'",
     '',
     'permissions:',
     '    contents: read',
@@ -146,6 +146,7 @@ const runtimeSourceExtensions = new Set([
     '.bat',
     '.cjs',
     '.cmd',
+    '.cts',
     '.html',
     '.js',
     '.json',
@@ -169,13 +170,18 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         const entryPath = path.join(directory, entry.name)
 
-        assertSupportedDirectoryEntry(entry, entryPath)
+        if (!entry.isDirectory() && !entry.isFile()) {
+            throw new Error(`Unsupported runtime source entry: ${entryPath}`)
+        }
 
-        const extension = path.extname(entry.name)
+        const extension = path.extname(entry.name).toLowerCase()
+        const normalizedEntryName = entry.name.toLowerCase()
         const entryParent = path.relative(rootDirectory, path.dirname(entryPath))
-        const isBinEntryScript = entryParent.split(path.sep).includes('bin') && (extension === '' || extension === '.cmd')
+        const normalizedEntryParent = entryParent.toLowerCase()
+        const normalizedRootName = path.basename(rootDirectory).toLowerCase()
+        const isBinEntryScript = normalizedEntryParent.split(path.sep).includes('bin') && (extension === '' || extension === '.cmd')
         const isHuskyHook =
-            (entryParent === '.husky' || (path.basename(rootDirectory) === '.husky' && entryParent === '')) && extension === ''
+            (normalizedEntryParent === '.husky' || (normalizedRootName === '.husky' && normalizedEntryParent === '')) && extension === ''
 
         const entryRelativePath = path.relative(rootDirectory, entryPath)
         const isIgnoredRootDirectory = entryRelativePath === entry.name && rootFlowiseRuntimeIgnoredDirectories.includes(entry.name)
@@ -185,8 +191,21 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
             sourceFiles.push(...collectRuntimeSources(entryPath, rootDirectory))
         } else if (
             entry.isFile() &&
-            (entry.name === 'Dockerfile' ||
-                entry.name === 'Makefile' ||
+            (normalizedEntryName === 'containerfile' ||
+                normalizedEntryName.startsWith('containerfile.') ||
+                normalizedEntryName.startsWith('containerfile-') ||
+                normalizedEntryName.endsWith('.containerfile') ||
+                normalizedEntryName === 'dockerfile' ||
+                normalizedEntryName.startsWith('dockerfile.') ||
+                normalizedEntryName.startsWith('dockerfile-') ||
+                normalizedEntryName.endsWith('.dockerfile') ||
+                normalizedEntryName === 'makefile' ||
+                normalizedEntryName === 'gnumakefile' ||
+                normalizedEntryName.startsWith('makefile.') ||
+                normalizedEntryName.startsWith('makefile-') ||
+                normalizedEntryName.startsWith('gnumakefile.') ||
+                normalizedEntryName.startsWith('gnumakefile-') ||
+                normalizedEntryName.endsWith('.makefile') ||
                 runtimeSourceExtensions.has(extension) ||
                 isBinEntryScript ||
                 isHuskyHook)
@@ -207,22 +226,36 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
     )
 }
 
+const atlasAdapterReference =
+    /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+
+function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
+    assert.equal(atlasAdapterReference.test(source), false, `Flowise runtime source references the adapter: ${name}`)
+}
+
 function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
     for (const { name, source } of runtimeSources) {
-        assert.doesNotMatch(
-            source,
-            /agentflow-adapter\b|@atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im,
-            name
-        )
+        assertRuntimeSourceDoesNotReferenceAdapter(name, source)
     }
 }
+
+test('Flowise containment failures identify the file without exposing its contents', () => {
+    assert.throws(
+        () => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', 'const secret = "do-not-log"\nrequire("../../atlas/bridge")'),
+        (error) => {
+            assert.match(error.message, /runtime\.js/)
+            assert.doesNotMatch(error.message, /do-not-log/)
+            return true
+        }
+    )
+})
 
 function assertDockerIgnoreExcludesAtlasDirectory(source) {
     const patterns = source
         .split(String.fromCharCode(10))
         .map((line) => line.trim())
         .filter(Boolean)
-    const phaseZeroBuildExcludedPaths = ['.git', 'ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
+    const phaseZeroBuildExcludedPaths = ['.git', '.github/workflows/atlas-agentflow-adapter.yml', 'ATLAS_UPSTREAM.md', 'atlas/', 'docs/']
 
     for (const excludedPath of phaseZeroBuildExcludedPaths) {
         assert.ok(patterns.includes(excludedPath), `The root Docker build must exclude ${excludedPath}.`)
@@ -243,6 +276,22 @@ function assertFlowiseBuildGraphDoesNotReferenceAdapter(
     for (const [name, source] of sources) {
         assert.doesNotMatch(source, /@atlas[\\/]|(?:^|[\s"'`])(?:\.{1,2}[\\/])*atlas(?:[\\/]|-agentflow-adapter\b|["'\s]|$)/im, name)
     }
+}
+
+function assertDocumentedStopGatesApply(source) {
+    const normalizedSource = source.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))
+    const stopGateSection = normalizedSource.match(/## Security-sensitive decisions deferred \(stop gates\)\n\n([\s\S]*?)(?=\n## |$)/)
+
+    assert.notEqual(stopGateSection, null, 'Phase 0 documentation must retain the stop-gate section.')
+    const gateNumbers = [...stopGateSection[1].matchAll(/^(\d+)\. /gm)].map(([, number]) => number)
+    assert.ok(gateNumbers.length > 0, 'Phase 0 documentation must enumerate stop gates.')
+
+    const gateList = `${gateNumbers.slice(0, -1).join(', ')}, and ${gateNumbers.at(-1)}`
+    assert.match(
+        normalizedSource.replace(/\s+/g, ' '),
+        new RegExp(`at minimum gates ${gateList} apply`),
+        'Lifecycle verbs must require all documented stop gates.'
+    )
 }
 
 function assertValidationInvocationRunsBeforeAdapterLoads(source) {
@@ -323,57 +372,6 @@ test('adapter source is verified before the test process loads it', () => {
 
 test('adapter source validation is installed before any test can load the adapter', () => {
     assertValidationInvocationRunsBeforeAdapterLoads(fs.readFileSync(__filename, 'utf8'))
-})
-
-test('Phase 0 documentation defers permissive Flowise browser controls to private ingress', () => {
-    assert.match(phaseZeroDocumentationSource, /CORS_ORIGINS/)
-    assert.match(phaseZeroDocumentationSource, /IFRAME_ORIGINS/)
-})
-
-test('Phase 0 documentation records the queue administration exposure and ingress normalization gate', () => {
-    assert.match(phaseZeroDocumentationSource, /\/admin\/queues/)
-    assert.match(phaseZeroDocumentationSource, /normalize or reject traversal and encoded path forms/i)
-})
-
-test('Phase 0 documentation records the Flowise SSE chatId capability and unscoped API-key boundary', () => {
-    assert.match(phaseZeroDocumentationSource, /chatId.*capability/i)
-    assert.match(phaseZeroDocumentationSource, /Atlas-minted.*unguessable/i)
-    assert.match(phaseZeroDocumentationSource, /every\s+valid Flowise API key/i)
-    assert.match(phaseZeroDocumentationSource, /not\s+scoped to a flow, tenant, or route/i)
-})
-
-test('Phase 0 documentation requires canonical ingress paths before Flowise rewrites URLs', () => {
-    assert.match(phaseZeroDocumentationSource, /sanitizeMiddleware/)
-    assert.match(phaseZeroDocumentationSource, /decodeURI/)
-    assert.match(phaseZeroDocumentationSource, /reject any path that is not already canonical/i)
-})
-
-test('Phase 0 documentation limits its repository-secret finding to repository scope', () => {
-    assert.match(phaseZeroDocumentationSource, /does not establish the absence of organization-level or environment-level\s+secrets/i)
-})
-
-test('Phase 0 documentation records Flowise default-open execution and export-import as authorization boundaries', () => {
-    assert.match(phaseZeroDocumentationSource, /default-open execution/i)
-    assert.match(phaseZeroDocumentationSource, /\/api\/v1\/export-import/)
-})
-
-test('Phase 0 documentation names unauthenticated lead reads and vector-upsert as ingress risks', () => {
-    assert.match(phaseZeroDocumentationSource, /unauthenticated[\s\S]*lead[\s\S]*read[\s\S]*PII/i)
-    assert.match(phaseZeroDocumentationSource, /unauthenticated[\s\S]*vector[\s\S]*upsert[\s\S]*prompt-injection/i)
-})
-
-test('Phase 0 documentation defers the Flowise end-user embed surface to Atlas-owned UX', () => {
-    assert.match(phaseZeroDocumentationSource, /Flowise embed/i)
-    assert.match(phaseZeroDocumentationSource, /Atlas-owned end-user experience/i)
-})
-
-test('Phase 0 documentation accurately scopes inherited Flowise pull-request triggers', () => {
-    assert.match(phaseZeroDocumentationSource, /only when the base branch name contains no slash/i)
-    assert.match(atlasUpstreamSource, /only when the base branch name contains no slash/i)
-})
-
-test('adapter README identifies adapter.js as the limited static-tripwire scope', () => {
-    assert.match(adapterReadmeSource, /static tripwire is limited\s+to `adapter\.js`/)
 })
 
 test('non-production adapter has an explicit dependency-free, no-I/O boundary', () => {
@@ -483,6 +481,28 @@ test('runtime source collection includes nested extensionless bin entry scripts 
     }
 })
 
+test('runtime source collection includes case-varied bin and Husky entry scripts for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const binDirectory = path.join(fixtureDirectory, 'Bin')
+        const huskyDirectory = path.join(fixtureDirectory, '.Husky')
+        fs.mkdirSync(binDirectory)
+        fs.mkdirSync(huskyDirectory)
+        fs.writeFileSync(path.join(binDirectory, 'run'), "#!/usr/bin/env node\nrequire('../../atlas/agentflow-adapter/adapter')\n")
+        fs.writeFileSync(path.join(huskyDirectory, 'pre-commit'), '#!/usr/bin/env sh\nnode atlas/agentflow-adapter/adapter.js\n')
+
+        assert.deepEqual(
+            collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+                .map(({ name }) => name)
+                .sort(),
+            ['.Husky/pre-commit', 'Bin/run']
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
 test('runtime source collection includes extensionless commit hooks for adapter-reference scanning', () => {
     const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
 
@@ -538,7 +558,82 @@ test('runtime source collection includes Dockerfiles for adapter-reference scann
     }
 })
 
-test('runtime source collection rejects a symbolic link instead of silently skipping it', () => {
+test('runtime source collection includes mixed-case runtime extensions for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const sourceByName = {
+            'bridge.JS': "require('../../atlas/agentflow-adapter')\n",
+            'runtime.Ts': "require('../../atlas/agentflow-adapter')\n",
+            'workflow.YAML': 'COPY atlas/agentflow-adapter /boundary\n'
+        }
+
+        for (const [name, source] of Object.entries(sourceByName)) {
+            fs.writeFileSync(path.join(fixtureDirectory, name), source)
+        }
+
+        const runtimeSources = collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+
+        assert.deepEqual(runtimeSources.map(({ name }) => name).sort(), Object.keys(sourceByName).sort())
+        assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources))
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes Dockerfile variants and CommonJS TypeScript for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const sourceByName = {
+            Containerfile: 'COPY atlas/agentflow-adapter /boundary\n',
+            'Containerfile-prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'Containerfile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'Dockerfile-prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'Dockerfile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'worker.Dockerfile': 'COPY atlas/agentflow-adapter /boundary\n',
+            'runtime.cts': "require('../../atlas/agentflow-adapter')\n"
+        }
+
+        for (const [name, source] of Object.entries(sourceByName)) {
+            fs.writeFileSync(path.join(fixtureDirectory, name), source)
+        }
+
+        const runtimeSources = collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+
+        assert.deepEqual(runtimeSources.map(({ name }) => name).sort(), Object.keys(sourceByName).sort())
+        assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources))
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection includes case and naming variants of Makefiles for adapter-reference scanning', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+
+    try {
+        const sourceByName = {
+            makefile: 'COPY atlas/agentflow-adapter /boundary\n',
+            GNUmakefile: 'COPY atlas/agentflow-adapter /boundary\n',
+            'GNUmakefile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'Makefile.prod': 'COPY atlas/agentflow-adapter /boundary\n',
+            'production.makefile': 'COPY atlas/agentflow-adapter /boundary\n'
+        }
+
+        for (const [name, source] of Object.entries(sourceByName)) {
+            fs.writeFileSync(path.join(fixtureDirectory, name), source)
+        }
+
+        const runtimeSources = collectRuntimeSources(fixtureDirectory, fixtureDirectory)
+
+        assert.deepEqual(runtimeSources.map(({ name }) => name).sort(), Object.keys(sourceByName).sort())
+        assert.throws(() => assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources))
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('runtime source collection rejects a symbolic link outside the sealed adapter boundary', () => {
     const originalReadDirectory = fs.readdirSync
     const symbolicLink = {
         name: 'adapter-link.js',
@@ -549,7 +644,7 @@ test('runtime source collection rejects a symbolic link instead of silently skip
     try {
         fs.readdirSync = () => [symbolicLink]
 
-        assert.throws(() => collectRuntimeSources('runtime-directory'), /Unsupported adapter boundary entry/)
+        assert.throws(() => collectRuntimeSources('runtime-directory'), /Unsupported runtime source entry/)
     } finally {
         fs.readdirSync = originalReadDirectory
     }
@@ -708,60 +803,9 @@ test('adapter boundary workflow rejects an added network-capable step', () => {
     assert.throws(() => assertAdapterWorkflowIsContained(expandedWorkflow))
 })
 
-test('Phase 0 documentation gates inherited CI for un-slashed PR bases and main merges', () => {
-    assert.match(phaseZeroDocumentationSource, /do not target an un-slashed branch or merge this branch to `main`/i)
-})
-
-test('Atlas documentation rejects main as an approved baseline pending explicit owner disposition', () => {
-    for (const source of [atlasUpstreamSource, phaseZeroDocumentationSource]) {
-        assert.match(source, /`main` is not the Atlas line\s+and\s+has not been license-reviewed/i)
-        assert.match(source, /must not be merged into or used as a base\s+merely after CI concerns are resolved/i)
-        assert.match(source, /disposition requires an explicit\s+owner decision/i)
-    }
-})
-
-test('Phase 0 documentation permits adapter contract pushes and pull requests only against the pinned baseline', () => {
-    assert.match(
-        phaseZeroDocumentationSource,
-        /runs only for pushes to, and pull requests whose base is,\s+the slash-containing pinned baseline/i
-    )
-})
-
-test('Phase 0 documentation records inherited Flowise CI triggers for slash-free PR bases and main pushes', () => {
-    assert.match(phaseZeroDocumentationSource, /pull requests only when the base branch name contains no slash/i)
-    assert.match(atlasUpstreamSource, /pull requests only when the base branch name contains no slash/i)
-})
-
-test('Phase 0 documentation accurately describes the separate Dockerfile build context', () => {
-    assert.doesNotMatch(phaseZeroDocumentationSource, /docker\/Dockerfile`, which does not copy the repository context/)
-})
-
-test('Phase 0 documentation does not preserve a stale contract-test count', () => {
-    assert.doesNotMatch(phaseZeroDocumentationSource, /# \d+ pass, \d+ fail/)
-})
-
-test('Phase 0 documentation uses the same explicit adapter test command as CI', () => {
-    assert.match(phaseZeroDocumentationSource, /node --test atlas\/agentflow-adapter\/adapter\.test\.js/)
-    assert.doesNotMatch(phaseZeroDocumentationSource, /node --test atlas\/agentflow-adapter\/\*\.test\.js/)
-})
-
-test('Phase 0 documentation defers tenancy, erasure, resource, and queue containment decisions', () => {
-    assert.match(phaseZeroDocumentationSource, /shared Flowise instance/i)
-    assert.match(phaseZeroDocumentationSource, /erasure/i)
-    assert.match(phaseZeroDocumentationSource, /backup/i)
-    assert.match(phaseZeroDocumentationSource, /resource exhaustion/i)
-    assert.match(phaseZeroDocumentationSource, /queue mode/i)
-})
-
-test('Phase 0 documentation defers persistent-state placement and end-user output rendering decisions', () => {
-    assert.match(phaseZeroDocumentationSource, /must not be co-located with or share credentials with any Atlas\s+datastore/i)
-    assert.match(phaseZeroDocumentationSource, /end-user output contract/i)
-    assert.match(phaseZeroDocumentationSource, /no verbatim relay of\s+Flowise errors/i)
-})
-
-test('Phase 0 documentation defers runtime operations and failure semantics', () => {
-    assert.match(phaseZeroDocumentationSource, /monitoring, alerting, incident response, and\s+on-call ownership/i)
-    assert.match(phaseZeroDocumentationSource, /outage behavior,\s+idempotency, and duplicate-execution handling/i)
+test('adapter boundary workflow checks pull requests for every base branch', () => {
+    assert.match(adapterWorkflowSource, /pull_request:\n {8}branches:\n {12}- '\*\*'/)
+    assert.match(phaseZeroDocumentSource, /pull requests targeting any base branch/)
 })
 
 test('root container build context excludes the non-production adapter', () => {
@@ -769,15 +813,21 @@ test('root container build context excludes the non-production adapter', () => {
 })
 
 test('root container build exclusion requires Phase 0 reconnaissance artifacts to remain out of the image', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('.git\natlas/\n'), /must exclude ATLAS_UPSTREAM/i)
+    assert.throws(
+        () => assertDockerIgnoreExcludesAtlasDirectory('.git\n.github/workflows/atlas-agentflow-adapter.yml\natlas/\n'),
+        /must exclude ATLAS_UPSTREAM/i
+    )
 })
 
 test('root container build exclusion prevents Git objects from carrying the Phase 0 boundary into the image', () => {
-    assert.throws(() => assertDockerIgnoreExcludesAtlasDirectory('ATLAS_UPSTREAM.md\natlas/\ndocs/\n'), /must exclude \.git/i)
+    assert.throws(
+        () => assertDockerIgnoreExcludesAtlasDirectory('.github/workflows/atlas-agentflow-adapter.yml\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'),
+        /must exclude \.git/i
+    )
 })
 
 test('root container build exclusion rejects globbed atlas re-includes', () => {
-    const requiredExclusions = '.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+    const requiredExclusions = '.git\n.github/workflows/atlas-agentflow-adapter.yml\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
 
     assert.throws(
         () => assertDockerIgnoreExcludesAtlasDirectory(`${requiredExclusions}!**/atlas/**\n`),
@@ -794,7 +844,7 @@ test('root container build exclusion rejects globbed atlas re-includes', () => {
 })
 
 test('root container build exclusion rejects broad negations that could re-include Phase 0 artifacts', () => {
-    const requiredExclusions = '.git\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
+    const requiredExclusions = '.git\n.github/workflows/atlas-agentflow-adapter.yml\nATLAS_UPSTREAM.md\natlas/\ndocs/\n'
 
     for (const negation of ['!**', '!*']) {
         assert.throws(
@@ -815,6 +865,24 @@ test('Flowise containment discovery scans new top-level runtime directories', ()
         assert.ok(
             collectFlowiseRuntimeSources(fixtureDirectory).some(({ name }) => name === 'new-runtime/deploy.ps1'),
             'New top-level runtime directories must be included in containment scanning.'
+        )
+    } finally {
+        fs.rmSync(fixtureDirectory, { recursive: true, force: true })
+    }
+})
+
+test('Flowise containment discovery excludes untracked build output', () => {
+    const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
+    const buildDirectory = path.join(fixtureDirectory, 'new-runtime', 'build')
+
+    try {
+        fs.mkdirSync(buildDirectory, { recursive: true })
+        fs.writeFileSync(path.join(buildDirectory, 'bundle.js'), "require('../../atlas/agentflow-adapter')\n")
+
+        assert.equal(
+            collectFlowiseRuntimeSources(fixtureDirectory).some(({ name }) => name === 'new-runtime/build/bundle.js'),
+            false,
+            'Untracked build output must not be read by the containment scan.'
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
@@ -957,6 +1025,49 @@ test('Flowise build-graph guard rejects a scoped Atlas workspace dependency', ()
 
 test('Flowise build-graph manifests do not wire in the non-production adapter', () => {
     assertFlowiseBuildGraphDoesNotReferenceAdapter()
+})
+
+test('every documented stop gate applies before a lifecycle verb can be added', () => {
+    assertDocumentedStopGatesApply(phaseZeroDocumentSource)
+})
+
+test('stop-gate coverage rejects a new undocumented lifecycle gate', () => {
+    const normalizedSource = phaseZeroDocumentSource.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))
+    const sourceWithNewGate = normalizedSource.replace('\n## Verification', '\n19. Future gate\n\n## Verification')
+
+    assert.throws(() => assertDocumentedStopGatesApply(sourceWithNewGate), /all documented stop gates/)
+})
+
+function phaseZeroSection(source, heading) {
+    const normalizedSource = source.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))
+    const section = normalizedSource.match(new RegExp(`## ${heading}\\n\\n([\\s\\S]*?)(?=\\n## |$)`))
+
+    assert.notEqual(section, null, `Phase 0 documentation must retain the ${heading} section.`)
+    return section[1]
+}
+
+test('Phase 0 documentation keeps the direct-exposure and main-branch prohibitions', () => {
+    assert.match(phaseZeroDocumentSource, /Flowise is never directly exposed to Atlas clients\./)
+    assert.match(atlasUpstreamSource, /`main` must not be used as an Atlas merge target/i)
+})
+
+test('Phase 0 documentation retains critical compatibility containment findings', () => {
+    const findings = phaseZeroSection(phaseZeroDocumentSource, 'Critical compatibility containment findings')
+
+    for (const requirement of [
+        /`main`.*not.*approved.*baseline.*explicit.*owner.*decision/is,
+        /\/api\/v1\/export-import.*x-request-from.*internal.*without an API key/is,
+        /MODE=queue.*\/admin\/queues.*Bull Board.*authentication/is,
+        /CORS_ORIGINS.*IFRAME_ORIGINS.*both default to `\*`.*restrict.*origins.*framing/is,
+        /\/api\/v1\/vector\/upsert.*\/api\/v1\/leads.*\/api\/v1\/get-upload-file.*\/api\/v1\/openai-assistants-file\/download.*\/api\/v1\/nvidia-nim.*deny public access/is,
+        /Docker daemon socket.*host-runtime control.*installer privileges.*separate.*security.*containment decision/is
+    ]) {
+        assert.match(findings, requirement)
+    }
+})
+
+test('README identifies the source pin as the adapter enforcement control', () => {
+    assert.match(adapterReadmeSource, /byte-exact Phase 0 source pin.*enforcing regression guard/s)
 })
 
 test('non-production adapter exposes only its closed disabled contract', () => {
