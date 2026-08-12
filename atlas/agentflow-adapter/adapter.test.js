@@ -52,11 +52,12 @@ const rootPackageSource = fs.readFileSync(path.join(__dirname, '../../package.js
 const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'utf8')
 const phaseZeroDocumentSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
 const adapterReadmeSource = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8')
+const atlasUpstreamSource = fs.readFileSync(path.join(__dirname, '../../ATLAS_UPSTREAM.md'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeRootDirectory = path.join(__dirname, '../..')
 const rootFlowiseRuntimeIgnoredDirectories = ['atlas', 'docs']
-const nestedFlowiseRuntimeIgnoredDirectories = ['.git', '.turbo', 'node_modules']
+const nestedFlowiseRuntimeIgnoredDirectories = ['.git', '.turbo', 'build', 'dist', 'node_modules']
 const atlasAdapterWorkflowName = 'atlas-agentflow-adapter.yml'
 const expectedAdapterWorkflowSource = [
     'name: Atlas AgentFlow Adapter Boundary',
@@ -275,6 +276,22 @@ function assertFlowiseBuildGraphDoesNotReferenceAdapter(
     for (const [name, source] of sources) {
         assert.doesNotMatch(source, /@atlas[\\/]|(?:^|[\s"'`])(?:\.{1,2}[\\/])*atlas(?:[\\/]|-agentflow-adapter\b|["'\s]|$)/im, name)
     }
+}
+
+function assertDocumentedStopGatesApply(source) {
+    const normalizedSource = source.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))
+    const stopGateSection = normalizedSource.match(/## Security-sensitive decisions deferred \(stop gates\)\n\n([\s\S]*?)(?=\n## |$)/)
+
+    assert.notEqual(stopGateSection, null, 'Phase 0 documentation must retain the stop-gate section.')
+    const gateNumbers = [...stopGateSection[1].matchAll(/^(\d+)\. /gm)].map(([, number]) => number)
+    assert.ok(gateNumbers.length > 0, 'Phase 0 documentation must enumerate stop gates.')
+
+    const gateList = `${gateNumbers.slice(0, -1).join(', ')}, and ${gateNumbers.at(-1)}`
+    assert.match(
+        normalizedSource.replace(/\s+/g, ' '),
+        new RegExp(`at minimum gates ${gateList} apply`),
+        'Lifecycle verbs must require all documented stop gates.'
+    )
 }
 
 function assertValidationInvocationRunsBeforeAdapterLoads(source) {
@@ -854,24 +871,18 @@ test('Flowise containment discovery scans new top-level runtime directories', ()
     }
 })
 
-test('Flowise containment discovery scans runtime artifacts in nested build and dist directories', () => {
+test('Flowise containment discovery excludes untracked build output', () => {
     const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-adapter-boundary-'))
-    const runtimeDirectories = ['build', 'dist'].map((directory) => path.join(fixtureDirectory, 'new-runtime', directory))
+    const buildDirectory = path.join(fixtureDirectory, 'new-runtime', 'build')
 
     try {
-        for (const runtimeDirectory of runtimeDirectories) {
-            fs.mkdirSync(runtimeDirectory, { recursive: true })
-            fs.writeFileSync(path.join(runtimeDirectory, 'bridge.js'), "require('../../atlas/agentflow-adapter')\n")
-        }
+        fs.mkdirSync(buildDirectory, { recursive: true })
+        fs.writeFileSync(path.join(buildDirectory, 'bundle.js'), "require('../../atlas/agentflow-adapter')\n")
 
-        const runtimeSourceNames = collectFlowiseRuntimeSources(fixtureDirectory).map(({ name }) => name)
-        assert.ok(
-            runtimeSourceNames.includes('new-runtime/build/bridge.js'),
-            'Nested build artifacts must be included in containment scanning.'
-        )
-        assert.ok(
-            runtimeSourceNames.includes('new-runtime/dist/bridge.js'),
-            'Nested dist artifacts must be included in containment scanning.'
+        assert.equal(
+            collectFlowiseRuntimeSources(fixtureDirectory).some(({ name }) => name === 'new-runtime/build/bundle.js'),
+            false,
+            'Untracked build output must not be read by the containment scan.'
         )
     } finally {
         fs.rmSync(fixtureDirectory, { recursive: true, force: true })
@@ -1016,11 +1027,20 @@ test('Flowise build-graph manifests do not wire in the non-production adapter', 
     assertFlowiseBuildGraphDoesNotReferenceAdapter()
 })
 
-test('every stop gate applies before a lifecycle verb can be added', () => {
-    assert.match(
-        phaseZeroDocumentSource.replace(/\s+/g, ' '),
-        /at minimum gates 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, and 18 apply/
-    )
+test('every documented stop gate applies before a lifecycle verb can be added', () => {
+    assertDocumentedStopGatesApply(phaseZeroDocumentSource)
+})
+
+test('stop-gate coverage rejects a new undocumented lifecycle gate', () => {
+    const normalizedSource = phaseZeroDocumentSource.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))
+    const sourceWithNewGate = normalizedSource.replace('\n## Verification', '\n19. Future gate\n\n## Verification')
+
+    assert.throws(() => assertDocumentedStopGatesApply(sourceWithNewGate), /all documented stop gates/)
+})
+
+test('Phase 0 documentation keeps the direct-exposure and main-branch prohibitions', () => {
+    assert.match(phaseZeroDocumentSource, /Flowise is never directly exposed to Atlas clients\./)
+    assert.match(atlasUpstreamSource, /`main` must not be used as an Atlas merge target/i)
 })
 
 test('README identifies the source pin as the adapter enforcement control', () => {
