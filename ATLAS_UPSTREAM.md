@@ -94,7 +94,7 @@ below and must be updated for any subsequent change to an inherited file.
 
 ## License review note
 
-This repository is based on the Apache 2.0 release identified above.
+This repository is based on the Apache 2.0 release identified above. Before any
 future upgrade, re-check the exact tag's `LICENSE.md`, third-party notices, and
 all paths proposed for reuse. Before any redistribution of this fork or an
 Atlas-built image, include a copy of the Apache-2.0 license, retain the
@@ -103,6 +103,13 @@ prominent notices stating that modified files have been changed. Reproduce any
 upstream `NOTICE` file; no upstream NOTICE file is present at `cf7d841`. This is
 an engineering record, not legal advice. Apache-2.0 does not grant trademark
 rights; any use of Flowise names or marks requires a separate review.
+
+The Phase-0 `.dockerignore` intentionally keeps this inventory and other Atlas
+reconnaissance artifacts out of the inherited root image build context. Before
+any Atlas-built image is distributed, the deferred supply-chain decision must
+provide the required Apache-2.0 modified-file notice and applicable attribution
+outside that excluded context. This is not authorization to build, publish, or
+deploy an image.
 
 ## Upstream remotes
 

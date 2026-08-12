@@ -168,7 +168,7 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
         const entryPath = path.join(directory, entry.name)
 
         if (!entry.isDirectory() && !entry.isFile()) {
-            continue
+            throw new Error(`Unsupported runtime source entry: ${entryPath}`)
         }
 
         const extension = path.extname(entry.name).toLowerCase()
@@ -614,7 +614,7 @@ test('runtime source collection includes case and naming variants of Makefiles f
     }
 })
 
-test('runtime source collection ignores a symbolic link outside the sealed adapter boundary', () => {
+test('runtime source collection rejects a symbolic link outside the sealed adapter boundary', () => {
     const originalReadDirectory = fs.readdirSync
     const symbolicLink = {
         name: 'adapter-link.js',
@@ -625,7 +625,7 @@ test('runtime source collection ignores a symbolic link outside the sealed adapt
     try {
         fs.readdirSync = () => [symbolicLink]
 
-        assert.deepEqual(collectRuntimeSources('runtime-directory'), [])
+        assert.throws(() => collectRuntimeSources('runtime-directory'), /Unsupported runtime source entry/)
     } finally {
         fs.readdirSync = originalReadDirectory
     }
