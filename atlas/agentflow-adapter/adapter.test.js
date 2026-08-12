@@ -50,6 +50,8 @@ const adapterWorkflowSource = fs
 const pnpmWorkspaceSource = fs.readFileSync(path.join(__dirname, '../../pnpm-workspace.yaml'), 'utf8')
 const rootPackageSource = fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8')
 const turboSource = fs.readFileSync(path.join(__dirname, '../../turbo.json'), 'utf8')
+const phaseZeroDocumentSource = fs.readFileSync(path.join(__dirname, '../../docs/atlas-agentflow-phase0.md'), 'utf8')
+const adapterReadmeSource = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8')
 
 const dockerIgnoreSource = fs.readFileSync(path.join(__dirname, '../../.dockerignore'), 'utf8')
 const flowiseRuntimeRootDirectory = path.join(__dirname, '../..')
@@ -65,7 +67,7 @@ const expectedAdapterWorkflowSource = [
     '            - atlas/pinned-flowise-2.2.7',
     '    pull_request:',
     '        branches:',
-    '            - atlas/pinned-flowise-2.2.7',
+    "            - '**'",
     '',
     'permissions:',
     '    contents: read',
@@ -784,6 +786,11 @@ test('adapter boundary workflow rejects an added network-capable step', () => {
     assert.throws(() => assertAdapterWorkflowIsContained(expandedWorkflow))
 })
 
+test('adapter boundary workflow checks pull requests for every base branch', () => {
+    assert.match(adapterWorkflowSource, /pull_request:\n {8}branches:\n {12}- '\*\*'/)
+    assert.match(phaseZeroDocumentSource, /pull requests targeting any base branch/)
+})
+
 test('root container build context excludes the non-production adapter', () => {
     assertDockerIgnoreExcludesAtlasDirectory(dockerIgnoreSource)
 })
@@ -1007,6 +1014,17 @@ test('Flowise build-graph guard rejects a scoped Atlas workspace dependency', ()
 
 test('Flowise build-graph manifests do not wire in the non-production adapter', () => {
     assertFlowiseBuildGraphDoesNotReferenceAdapter()
+})
+
+test('every stop gate applies before a lifecycle verb can be added', () => {
+    assert.match(
+        phaseZeroDocumentSource.replace(/\s+/g, ' '),
+        /at minimum gates 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, and 18 apply/
+    )
+})
+
+test('README identifies the source pin as the adapter enforcement control', () => {
+    assert.match(adapterReadmeSource, /byte-exact Phase 0 source pin.*enforcing regression guard/s)
 })
 
 test('non-production adapter exposes only its closed disabled contract', () => {

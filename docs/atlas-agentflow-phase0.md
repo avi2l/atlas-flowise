@@ -245,8 +245,8 @@ No request shape is accepted. It defines no Atlas credential, actor, permission,
 data, or transport protocol. The closed surface is a deliberate tripwire, not a
 production lifecycle contract: any additional verb requires all applicable
 stop-gate decisions and an explicit contract-test change; at minimum gates 1,
-2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16, 17, and 18 apply to a lifecycle
-verb.
+2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, and 18 apply to a
+lifecycle verb.
 
 ## Security-sensitive decisions deferred (stop gates)
 
@@ -350,9 +350,10 @@ node --test atlas/agentflow-adapter/adapter.test.js
 
 The standalone `Atlas AgentFlow Adapter Boundary` workflow is constrained by
 this contract test to its single Node 20 contract step, without installing or
-starting Flowise. It runs only for pushes to, and pull requests whose base is,
-the slash-containing pinned baseline (`atlas/pinned-flowise-2.2.7`); that slash
-does not match the inherited PR workflows' slash-free base filter. This is a
+starting Flowise. It runs for pushes to the slash-containing pinned baseline
+(`atlas/pinned-flowise-2.2.7`) and for pull requests targeting any base branch;
+the latter coverage provides the same containment check when a proposed branch
+is incorrectly targeted at an un-slashed base. This is a
 regression check, not an enforcement boundary against an adversarial edit: the
 workflow and its test execute from the proposed revision, and the pinned
 baseline has no branch-protection rule. Do not target an un-slashed base or merge
