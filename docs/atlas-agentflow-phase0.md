@@ -38,6 +38,28 @@ gates below are additional constraints, not a path to make `main` approved.
 | Example content            | `packages/server/marketplaces/agentflows/` contains example flow JSON.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Examples are reconnaissance material only; no marketplace flow or production data is imported into the adapter.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | License/pin                | `ATLAS_UPSTREAM.md` records Apache 2.0 for this exact release and forbids automatic upstream sync.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Any future upstream change requires the recorded per-change license/security/API review; no later enterprise/commercial code may be copied.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
+## Critical compatibility containment findings
+
+-   `main` is **not an approved Atlas baseline**. Its disposition requires an
+    explicit owner decision; do not merge it or use it as an Atlas base.
+-   `/api/v1/export-import` accepts the client-settable `x-request-from: internal`
+    path without an API key when Basic Auth is absent. It is an
+    instance-administration/data-egress surface, not a tenant-safe integration API.
+-   With `MODE=queue`, `/admin/queues` exposes Bull Board queue administration
+    outside the authentication middleware. A contained deployment must deny direct
+    access; queue mode remains a stop-gate decision.
+-   `CORS_ORIGINS` and `IFRAME_ORIGINS` both default to `*`. A future contained
+    ingress must restrict browser origins and framing; these defaults are not an
+    Atlas security control.
+-   The public prefixes `/api/v1/vector/upsert`, `/api/v1/leads`,
+    `/api/v1/get-upload-file`, `/api/v1/openai-assistants-file/download`, and
+    `/api/v1/nvidia-nim` include sensitive write, data-egress, and host-control
+    surfaces. A future ingress must deny public access and make an explicit,
+    version-specific decision for every Flowise path.
+-   Flowise must not receive a Docker daemon socket, host-runtime control, or
+    installer privileges. Any exception requires a separate Atlas security and
+    deployment-containment decision.
+
 ## Service boundary
 
 ```text

@@ -1038,9 +1038,32 @@ test('stop-gate coverage rejects a new undocumented lifecycle gate', () => {
     assert.throws(() => assertDocumentedStopGatesApply(sourceWithNewGate), /all documented stop gates/)
 })
 
+function phaseZeroSection(source, heading) {
+    const normalizedSource = source.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10))
+    const section = normalizedSource.match(new RegExp(`## ${heading}\\n\\n([\\s\\S]*?)(?=\\n## |$)`))
+
+    assert.notEqual(section, null, `Phase 0 documentation must retain the ${heading} section.`)
+    return section[1]
+}
+
 test('Phase 0 documentation keeps the direct-exposure and main-branch prohibitions', () => {
     assert.match(phaseZeroDocumentSource, /Flowise is never directly exposed to Atlas clients\./)
     assert.match(atlasUpstreamSource, /`main` must not be used as an Atlas merge target/i)
+})
+
+test('Phase 0 documentation retains critical compatibility containment findings', () => {
+    const findings = phaseZeroSection(phaseZeroDocumentSource, 'Critical compatibility containment findings')
+
+    for (const requirement of [
+        /`main`.*not.*approved.*baseline.*explicit.*owner.*decision/is,
+        /\/api\/v1\/export-import.*x-request-from.*internal.*without an API key/is,
+        /MODE=queue.*\/admin\/queues.*Bull Board.*authentication/is,
+        /CORS_ORIGINS.*IFRAME_ORIGINS.*both default to `\*`.*restrict.*origins.*framing/is,
+        /\/api\/v1\/vector\/upsert.*\/api\/v1\/leads.*\/api\/v1\/get-upload-file.*\/api\/v1\/openai-assistants-file\/download.*\/api\/v1\/nvidia-nim.*deny public access/is,
+        /Docker daemon socket.*host-runtime control.*installer privileges.*separate.*security.*containment decision/is
+    ]) {
+        assert.match(findings, requirement)
+    }
 })
 
 test('README identifies the source pin as the adapter enforcement control', () => {
