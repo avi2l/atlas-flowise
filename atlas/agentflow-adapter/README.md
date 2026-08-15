@@ -15,11 +15,13 @@ call Flowise. Its exported dependency declaration is intentionally empty; it
 is a declarative marker. The contract test's byte-exact Phase 0 source pin is
 the enforcing regression guard for `adapter.js`: any source change fails the
 contract. Its separately tested static tripwire documents prohibited imports and
-common filesystem, network, process-environment, and child-process access; it is
-not an independent runtime enforcement mechanism. The contract test closed-lists
-the Phase 0 `atlas/` boundary to this directory and every file in it. The
-separate runtime-source scan does not scan every possible file type; neither
-check is a complete proof against every indirect JavaScript runtime capability.
+common filesystem, network, process-environment, and child-process access; it also
+rejects Flowise runtime references that reach the Atlas boundary through nested or
+absolute path segments on POSIX or Windows. It is not an independent runtime
+enforcement mechanism. The contract test closed-lists the Phase 0 `atlas/`
+boundary to this directory and every file in it. The separate runtime-source scan
+does not scan every possible file type; neither check is a complete proof against
+every indirect JavaScript runtime capability.
 
 No request contract exists in Phase 0. The adapter deliberately does not model
 Atlas users, actors, permissions, projects, assignments, credentials, inputs,
