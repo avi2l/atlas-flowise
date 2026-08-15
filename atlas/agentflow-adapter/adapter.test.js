@@ -380,10 +380,7 @@ test('non-production adapter has an explicit dependency-free, no-I/O boundary', 
 
 test('Flowise containment rejects absolute Windows paths into the Atlas boundary', () => {
     assert.throws(() =>
-        assertRuntimeSourceDoesNotReferenceAdapter(
-            'deploy.ps1',
-            'Copy-Item -Recurse C:/repo/atlas/bridge C:/runtime/bridge\n'
-        )
+        assertRuntimeSourceDoesNotReferenceAdapter('deploy.ps1', 'Copy-Item -Recurse C:/repo/atlas/bridge C:/runtime/bridge\n')
     )
 })
 
