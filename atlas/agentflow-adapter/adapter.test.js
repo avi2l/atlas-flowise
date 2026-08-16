@@ -227,7 +227,7 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 }
 
 const atlasAdapterReference =
-    /agentflow-adapter\b|@atlas[\\/]|[\\/]atlas[\\/]|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+    /agentflow-adapter\b|@atlas[\\/]|[\\/]atlas(?:[\\/]|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|(?:^|[\s"'`])\/atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
     assert.equal(atlasAdapterReference.test(source), false, `Flowise runtime source references the adapter: ${name}`)
@@ -382,6 +382,15 @@ test('Flowise containment rejects absolute Windows paths into the Atlas boundary
     assert.throws(() =>
         assertRuntimeSourceDoesNotReferenceAdapter('deploy.ps1', 'Copy-Item -Recurse C:/repo/atlas/bridge C:/runtime/bridge\n')
     )
+})
+
+test('Flowise containment rejects an absolute path ending at the Atlas boundary root', () => {
+    for (const [name, source] of [
+        ['deploy.ps1', 'Copy-Item -Recurse C:/repo/atlas C:/runtime\n'],
+        ['deploy.sh', 'cp -R /repo/atlas /runtime\n']
+    ]) {
+        assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter(name, source))
+    }
 })
 
 test('runtime source collection includes PowerShell scripts for adapter-reference scanning', () => {
