@@ -389,16 +389,11 @@ test('Flowise containment rejects absolute Windows paths into the Atlas boundary
 })
 
 test('Flowise containment rejects absolute POSIX paths into the Atlas boundary', () => {
-    assert.throws(() =>
-        assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const boundary = '/srv/flowise/atlas/bridge'")
-    )
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const boundary = '/srv/flowise/atlas/bridge'"))
 })
 
 test('Flowise containment rejects absolute POSIX paths regardless of identifier or call site', () => {
-    for (const source of [
-        "const atlasPath = '/srv/flowise/atlas/bridge'",
-        "readFileSync('/srv/flowise/atlas/bridge')"
-    ]) {
+    for (const source of ["const atlasPath = '/srv/flowise/atlas/bridge'", "readFileSync('/srv/flowise/atlas/bridge')"]) {
         assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
     }
 })
