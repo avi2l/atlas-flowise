@@ -227,7 +227,7 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 }
 
 const atlasAdapterReference =
-    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`])\/(?:[^\s\/"'`]+\/)+atlas(?:\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|\b(?:path|directory|dir|root|boundary)\s*=\s*["'`]\/(?:[^\s\/"'`]+\/)+atlas(?:\/|(?=["'`]))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
     assert.equal(atlasAdapterReference.test(source), false, `Flowise runtime source references the adapter: ${name}`)
@@ -406,7 +406,13 @@ test('Flowise containment rejects an absolute path ending at the Atlas boundary 
 })
 
 test('Flowise containment allows non-filesystem Atlas URL and route segments', () => {
-    for (const source of ["fetch('https://example.com/atlas/jobs')", "app.get('/atlas/status', handler)", 'const route = /atlas/i']) {
+    for (const source of [
+        "fetch('https://example.com/atlas/jobs')",
+        "app.get('/atlas/status', handler)",
+        "app.get('/api/atlas/status', handler)",
+        "const route = '/api/atlas/status'",
+        'const routePattern = /atlas/i'
+    ]) {
         assert.doesNotThrow(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
     }
 })
