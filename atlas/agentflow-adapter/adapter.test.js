@@ -227,7 +227,7 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 }
 
 const atlasAdapterReference =
-    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`])\/(?:[^\s\/"'`]+\/)+atlas(?:\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
     assert.equal(atlasAdapterReference.test(source), false, `Flowise runtime source references the adapter: ${name}`)
@@ -381,6 +381,12 @@ test('non-production adapter has an explicit dependency-free, no-I/O boundary', 
 test('Flowise containment rejects absolute Windows paths into the Atlas boundary', () => {
     assert.throws(() =>
         assertRuntimeSourceDoesNotReferenceAdapter('deploy.ps1', 'Copy-Item -Recurse C:/repo/atlas/bridge C:/runtime/bridge\n')
+    )
+})
+
+test('Flowise containment rejects absolute POSIX paths into the Atlas boundary', () => {
+    assert.throws(() =>
+        assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const boundary = '/srv/flowise/atlas/bridge'")
     )
 })
 
