@@ -227,12 +227,13 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 }
 
 const atlasAdapterReference =
-    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`])\/(?:[^\s\/"'`]+\/)+atlas(?:\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`])\/(?:[^\s\/"'`]+\/)*atlas(?:\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
 const nonFilesystemRouteLiteral =
     /\b[A-Za-z_$][\w$]*\.(?:all|delete|get|head|options|patch|post|put|route|use)\s*\(\s*["'`]\/[^\s"'`]*["'`]/gi
+const nonFilesystemAtlasRegexLiteral = /\/atlas\/[dgimsuvy]*(?=[\s),.;}\]]|$)/gi
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
-    const sourceWithoutRouteLiterals = source.replace(nonFilesystemRouteLiteral, '')
+    const sourceWithoutRouteLiterals = source.replace(nonFilesystemRouteLiteral, '').replace(nonFilesystemAtlasRegexLiteral, '')
 
     assert.equal(atlasAdapterReference.test(sourceWithoutRouteLiterals), false, `Flowise runtime source references the adapter: ${name}`)
 }
@@ -389,7 +390,9 @@ test('Flowise containment rejects absolute Windows paths into the Atlas boundary
 })
 
 test('Flowise containment rejects absolute POSIX paths into the Atlas boundary', () => {
-    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const boundary = '/srv/flowise/atlas/bridge'"))
+    for (const source of ["const boundary = '/srv/flowise/atlas/bridge'", "const boundary = '/atlas/bridge'"]) {
+        assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+    }
 })
 
 test('Flowise containment rejects absolute POSIX paths regardless of identifier or call site', () => {
