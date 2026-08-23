@@ -228,14 +228,20 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 
 const atlasAdapterReference =
     /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`])\/(?:[^\s\/"'`]+\/)*atlas(?:\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
-const nonFilesystemRouteLiteral =
-    /\b(?:app|router|[A-Za-z_$][\w$]*(?:App|Router))\.(?:all|delete|get|head|options|patch|post|put|route|use)\s*\(\s*["'`]\/[^\s"'`]*["'`]/gi
-const nonFilesystemAtlasRegexLiteral = /\/atlas\/[dgimsuvy]*(?=[\s),.;}\]]|$)/gi
+const nonFilesystemAtlasRegexLiteral =
+    /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?=[\s),.;}\]]|$)/gim
+const javascriptRuntimeSourceExtensions = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx'])
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
-    const sourceWithoutRouteLiterals = source.replace(nonFilesystemRouteLiteral, '').replace(nonFilesystemAtlasRegexLiteral, '')
+    const sourceWithoutNonFilesystemLiterals = javascriptRuntimeSourceExtensions.has(path.extname(name).toLowerCase())
+        ? source.replace(nonFilesystemAtlasRegexLiteral, '$1$2')
+        : source
 
-    assert.equal(atlasAdapterReference.test(sourceWithoutRouteLiterals), false, `Flowise runtime source references the adapter: ${name}`)
+    assert.equal(
+        atlasAdapterReference.test(sourceWithoutNonFilesystemLiterals),
+        false,
+        `Flowise runtime source references the adapter: ${name}`
+    )
 }
 
 function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
@@ -405,6 +411,20 @@ test('Flowise containment rejects absolute POSIX paths regardless of identifier 
     }
 })
 
+test('Flowise containment does not classify shell Atlas paths as JavaScript regex literals', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('deploy.sh', 'cp /atlas/img /runtime'))
+})
+
+test('Flowise containment does not trust route-like receiver names as filesystem exemptions', () => {
+    const source = "const app = { get: readFileSync }; app.get('/atlas/secrets')"
+
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+})
+
+test('Flowise containment does not classify Atlas strings with dotted path components as regex literals', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const route = '/atlas/.well-known'"))
+})
+
 test('Flowise containment rejects UNC paths into the Atlas boundary', () => {
     assert.throws(() =>
         assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', String.raw`const boundary = '\\server\share\atlas\bridge'`)
@@ -420,13 +440,8 @@ test('Flowise containment rejects an absolute path ending at the Atlas boundary 
     }
 })
 
-test('Flowise containment allows non-filesystem Atlas URL and route segments', () => {
-    for (const source of [
-        "fetch('https://example.com/atlas/jobs')",
-        "app.get('/atlas/status', handler)",
-        "app.get('/api/atlas/status', handler)",
-        'const routePattern = /atlas/i'
-    ]) {
+test('Flowise containment allows absolute Atlas URLs and JavaScript regex literals', () => {
+    for (const source of ["fetch('https://example.com/atlas/jobs')", 'const routePattern = /atlas/i']) {
         assert.doesNotThrow(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
     }
 })
