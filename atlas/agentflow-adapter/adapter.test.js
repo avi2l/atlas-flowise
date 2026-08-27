@@ -228,7 +228,7 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 
 const atlasAdapterReference =
     /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`}=])\\?\/(?:[^\s\/"'`]+\\?\/)*atlas(?:\\?\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
-const nonFilesystemAtlasRegexLiteral = /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?=[\s),.;}\]<]|$)/gim
+const nonFilesystemAtlasRegexLiteral = /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?!\s*\+)(?=[\s),.;}\]<]|$)/gim
 const javascriptRuntimeSourceExtensions = new Set(['.cjs', '.cts', '.html', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx', '.vue'])
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
@@ -436,6 +436,10 @@ test('Flowise containment does not trust route-like receiver names as filesystem
 
 test('Flowise containment does not classify Atlas strings with dotted path components as regex literals', () => {
     assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const route = '/atlas/.well-known'"))
+})
+
+test('Flowise containment rejects Atlas regex literals coerced into absolute paths', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const boundary = /atlas/ + 'bridge'"))
 })
 
 test('Flowise containment rejects UNC paths into the Atlas boundary', () => {
