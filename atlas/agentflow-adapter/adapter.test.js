@@ -227,9 +227,9 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 }
 
 const atlasAdapterReference =
-    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`}=])\/(?:[^\s\/"'`]+\/)*atlas(?:\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
-const nonFilesystemAtlasRegexLiteral = /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?=[\s),.;}\]]|$)/gim
-const javascriptRuntimeSourceExtensions = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx'])
+    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`}=])\\?\/(?:[^\s\/"'`]+\\?\/)*atlas(?:\\?\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+const nonFilesystemAtlasRegexLiteral = /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?=[\s),.;}\]<]|$)/gim
+const javascriptRuntimeSourceExtensions = new Set(['.cjs', '.cts', '.html', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx', '.vue'])
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
     const sourceWithoutNonFilesystemLiterals = javascriptRuntimeSourceExtensions.has(path.extname(name).toLowerCase())
@@ -418,6 +418,12 @@ test('Flowise containment rejects unquoted absolute POSIX paths after assignment
     assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('deploy.sh', 'ATLAS_DIR=/srv/flowise/atlas/bridge'))
 })
 
+test('Flowise containment rejects escaped separators in absolute POSIX Atlas paths', () => {
+    for (const source of [String.raw`const boundary = '/atlas\/bridge'`, String.raw`readFileSync('/srv/flowise/atlas\/bridge')`]) {
+        assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+    }
+})
+
 test('Flowise containment does not classify shell Atlas paths as JavaScript regex literals', () => {
     assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('deploy.sh', 'cp /atlas/img /runtime'))
 })
@@ -450,6 +456,12 @@ test('Flowise containment rejects an absolute path ending at the Atlas boundary 
 test('Flowise containment allows absolute Atlas URLs and JavaScript regex literals', () => {
     for (const source of ["fetch('https://example.com/atlas/jobs')", 'const routePattern = /atlas/i']) {
         assert.doesNotThrow(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+    }
+})
+
+test('Flowise containment allows JavaScript regex literals in scanned web component sources', () => {
+    for (const name of ['runtime.vue', 'runtime.html']) {
+        assert.doesNotThrow(() => assertRuntimeSourceDoesNotReferenceAdapter(name, '<script>const routePattern = /atlas/i</script>'))
     }
 })
 
