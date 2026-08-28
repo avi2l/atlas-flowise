@@ -227,10 +227,21 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 }
 
 const atlasAdapterReference =
-    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+    /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`}=])\\?\/(?:[^\s\/"'`]+\\?\/)*atlas(?:\\?\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+const nonFilesystemAtlasRegexLiteral = /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?!\s*\+)(?=[\s),.;}\]<]|$)/gim
+const atlasRegexLiteralTemplatePath = /\$\{\s*\/atlas\/[dgimsuvy]*\}\s*\//im
+const javascriptRuntimeSourceExtensions = new Set(['.cjs', '.cts', '.html', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx', '.vue'])
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
-    assert.equal(atlasAdapterReference.test(source), false, `Flowise runtime source references the adapter: ${name}`)
+    const sourceWithoutNonFilesystemLiterals = javascriptRuntimeSourceExtensions.has(path.extname(name).toLowerCase())
+        ? source.replace(nonFilesystemAtlasRegexLiteral, '$1$2')
+        : source
+
+    assert.equal(
+        atlasAdapterReference.test(sourceWithoutNonFilesystemLiterals) || atlasRegexLiteralTemplatePath.test(source),
+        false,
+        `Flowise runtime source references the adapter: ${name}`
+    )
 }
 
 function assertFlowiseRuntimeDoesNotReferenceAdapter(runtimeSources = collectFlowiseRuntimeSources()) {
@@ -384,6 +395,58 @@ test('Flowise containment rejects absolute Windows paths into the Atlas boundary
     )
 })
 
+test('Flowise containment rejects absolute POSIX paths into the Atlas boundary', () => {
+    for (const source of ["const boundary = '/srv/flowise/atlas/bridge'", "const boundary = '/atlas/bridge'"]) {
+        assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+    }
+})
+
+test('Flowise containment rejects absolute POSIX paths regardless of identifier or call site', () => {
+    for (const source of [
+        "const atlasPath = '/srv/flowise/atlas/bridge'",
+        "readFileSync('/srv/flowise/atlas/bridge')",
+        "storage.get('/srv/flowise/atlas/bridge')"
+    ]) {
+        assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+    }
+})
+
+test('Flowise containment rejects dynamically rooted POSIX paths into the Atlas boundary', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', 'const boundary = `${runtimeRoot}/atlas/bridge`'))
+})
+
+test('Flowise containment rejects unquoted absolute POSIX paths after assignment operators', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('deploy.sh', 'ATLAS_DIR=/srv/flowise/atlas/bridge'))
+})
+
+test('Flowise containment rejects escaped separators in absolute POSIX Atlas paths', () => {
+    for (const source of [String.raw`const boundary = '/atlas\/bridge'`, String.raw`readFileSync('/srv/flowise/atlas\/bridge')`]) {
+        assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+    }
+})
+
+test('Flowise containment does not classify shell Atlas paths as JavaScript regex literals', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('deploy.sh', 'cp /atlas/img /runtime'))
+})
+
+test('Flowise containment does not trust route-like receiver names as filesystem exemptions', () => {
+    const source = "const app = { get: readFileSync }; app.get('/atlas/secrets')"
+
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+})
+
+test('Flowise containment does not classify Atlas strings with dotted path components as regex literals', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const route = '/atlas/.well-known'"))
+})
+
+test('Flowise containment rejects Atlas regex literals coerced into absolute paths', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const boundary = /atlas/ + 'bridge'"))
+})
+
+test('Flowise containment rejects Atlas regex literals coerced inside template paths', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', 'const boundary = `${/atlas/}/bridge`'))
+})
+
 test('Flowise containment rejects UNC paths into the Atlas boundary', () => {
     assert.throws(() =>
         assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', String.raw`const boundary = '\\server\share\atlas\bridge'`)
@@ -399,9 +462,15 @@ test('Flowise containment rejects an absolute path ending at the Atlas boundary 
     }
 })
 
-test('Flowise containment allows non-filesystem Atlas URL and route segments', () => {
-    for (const source of ["fetch('https://example.com/atlas/jobs')", "app.get('/atlas/status', handler)", 'const route = /atlas/i']) {
+test('Flowise containment allows absolute Atlas URLs and JavaScript regex literals', () => {
+    for (const source of ["fetch('https://example.com/atlas/jobs')", 'const routePattern = /atlas/i']) {
         assert.doesNotThrow(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', source))
+    }
+})
+
+test('Flowise containment allows JavaScript regex literals in scanned web component sources', () => {
+    for (const name of ['runtime.vue', 'runtime.html']) {
+        assert.doesNotThrow(() => assertRuntimeSourceDoesNotReferenceAdapter(name, '<script>const routePattern = /atlas/i</script>'))
     }
 })
 
