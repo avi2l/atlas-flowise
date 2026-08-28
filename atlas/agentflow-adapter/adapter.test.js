@@ -229,6 +229,7 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 const atlasAdapterReference =
     /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`}=])\\?\/(?:[^\s\/"'`]+\\?\/)*atlas(?:\\?\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
 const nonFilesystemAtlasRegexLiteral = /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?!\s*\+)(?=[\s),.;}\]<]|$)/gim
+const atlasRegexLiteralTemplatePath = /\$\{\s*\/atlas\/[dgimsuvy]*\}\s*\//im
 const javascriptRuntimeSourceExtensions = new Set(['.cjs', '.cts', '.html', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx', '.vue'])
 
 function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
@@ -237,7 +238,7 @@ function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
         : source
 
     assert.equal(
-        atlasAdapterReference.test(sourceWithoutNonFilesystemLiterals),
+        atlasAdapterReference.test(sourceWithoutNonFilesystemLiterals) || atlasRegexLiteralTemplatePath.test(source),
         false,
         `Flowise runtime source references the adapter: ${name}`
     )
@@ -440,6 +441,10 @@ test('Flowise containment does not classify Atlas strings with dotted path compo
 
 test('Flowise containment rejects Atlas regex literals coerced into absolute paths', () => {
     assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', "const boundary = /atlas/ + 'bridge'"))
+})
+
+test('Flowise containment rejects Atlas regex literals coerced inside template paths', () => {
+    assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('runtime.js', 'const boundary = `${/atlas/}/bridge`'))
 })
 
 test('Flowise containment rejects UNC paths into the Atlas boundary', () => {
