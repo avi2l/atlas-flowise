@@ -164,6 +164,20 @@ const runtimeSourceExtensions = new Set([
     '.yml'
 ])
 
+function isMakeRuntimeSourceName(name) {
+    const normalizedName = path.basename(name).toLowerCase()
+
+    return (
+        normalizedName === 'makefile' ||
+        normalizedName === 'gnumakefile' ||
+        normalizedName.startsWith('makefile.') ||
+        normalizedName.startsWith('makefile-') ||
+        normalizedName.startsWith('gnumakefile.') ||
+        normalizedName.startsWith('gnumakefile-') ||
+        normalizedName.endsWith('.makefile')
+    )
+}
+
 function collectRuntimeSources(directory, rootDirectory = directory) {
     const sourceFiles = []
 
@@ -199,13 +213,7 @@ function collectRuntimeSources(directory, rootDirectory = directory) {
                 normalizedEntryName.startsWith('dockerfile.') ||
                 normalizedEntryName.startsWith('dockerfile-') ||
                 normalizedEntryName.endsWith('.dockerfile') ||
-                normalizedEntryName === 'makefile' ||
-                normalizedEntryName === 'gnumakefile' ||
-                normalizedEntryName.startsWith('makefile.') ||
-                normalizedEntryName.startsWith('makefile-') ||
-                normalizedEntryName.startsWith('gnumakefile.') ||
-                normalizedEntryName.startsWith('gnumakefile-') ||
-                normalizedEntryName.endsWith('.makefile') ||
+                isMakeRuntimeSourceName(normalizedEntryName) ||
                 runtimeSourceExtensions.has(extension) ||
                 isBinEntryScript ||
                 isHuskyHook)
@@ -228,6 +236,8 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 
 const atlasAdapterReference =
     /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`}=])\\?\/(?:[^\s\/"'`]+\\?\/)*atlas(?:\\?\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`=])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|=atlas(?:[\\/]|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
+const makeAtlasAssignmentReference =
+    /^\s*(?:(?:export|override|private)\s+)*(?:[^#=\r\n]+:\s*)?(?:(?:export|override|private)\s+)*[A-Za-z_][A-Za-z0-9_.-]*\s*(?:[?!+]|:{1,3})?=\s*atlas(?:[\\/]|(?=[\s"'`]|$))/im
 const nonFilesystemAtlasRegexLiteral = /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?!\s*\+)(?=[\s),.;}\]<]|$)/gim
 const atlasRegexLiteralTemplatePath = /\$\{\s*\/atlas\/[dgimsuvy]*\}\s*\//im
 const javascriptRuntimeSourceExtensions = new Set(['.cjs', '.cts', '.html', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx', '.vue'])
@@ -238,7 +248,9 @@ function assertRuntimeSourceDoesNotReferenceAdapter(name, source) {
         : source
 
     assert.equal(
-        atlasAdapterReference.test(sourceWithoutNonFilesystemLiterals) || atlasRegexLiteralTemplatePath.test(source),
+        atlasAdapterReference.test(sourceWithoutNonFilesystemLiterals) ||
+            (isMakeRuntimeSourceName(name) && makeAtlasAssignmentReference.test(source)) ||
+            atlasRegexLiteralTemplatePath.test(source),
         false,
         `Flowise runtime source references the adapter: ${name}`
     )
@@ -427,6 +439,30 @@ test('Flowise containment rejects unquoted relative Atlas paths after shell assi
 
 test('Flowise containment rejects unquoted bare Atlas paths after shell assignment operators', () => {
     assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('deploy.sh', 'ATLAS_DIR=atlas/bridge'))
+})
+
+test('Flowise containment rejects bare Atlas paths in Make assignments', () => {
+    for (const source of [
+        'ATLAS_DIR = atlas/bridge',
+        'ATLAS_DIR := atlas/bridge',
+        'ATLAS_DIR ::= atlas/bridge',
+        'ATLAS_DIR :::= atlas/bridge',
+        'ATLAS_DIR ?= atlas/bridge',
+        'ATLAS_DIR += atlas/bridge',
+        'ATLAS_DIR != atlas/bridge'
+    ]) {
+        assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('Makefile', source))
+    }
+})
+
+test('Flowise containment rejects prefixed bare Atlas paths in Make assignments', () => {
+    for (const source of ['export ATLAS_DIR := atlas/bridge', 'override ATLAS_DIR := atlas/bridge', 'deploy: ATLAS_DIR := atlas/bridge']) {
+        assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('Makefile', source))
+    }
+})
+
+test('Flowise containment allows comparisons with an Atlas identifier', () => {
+    assert.doesNotThrow(() => assertRuntimeSourceDoesNotReferenceAdapter('Makefile', 'const matched = renderer === atlas\n'))
 })
 
 test('Flowise containment rejects escaped separators in absolute POSIX Atlas paths', () => {
