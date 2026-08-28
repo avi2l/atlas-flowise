@@ -456,11 +456,7 @@ test('Flowise containment rejects bare Atlas paths in Make assignments', () => {
 })
 
 test('Flowise containment rejects prefixed bare Atlas paths in Make assignments', () => {
-    for (const source of [
-        'export ATLAS_DIR := atlas/bridge',
-        'override ATLAS_DIR := atlas/bridge',
-        'deploy: ATLAS_DIR := atlas/bridge'
-    ]) {
+    for (const source of ['export ATLAS_DIR := atlas/bridge', 'override ATLAS_DIR := atlas/bridge', 'deploy: ATLAS_DIR := atlas/bridge']) {
         assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('Makefile', source))
     }
 })
