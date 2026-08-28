@@ -236,7 +236,7 @@ function collectFlowiseRuntimeSources(rootDirectory = flowiseRuntimeRootDirector
 
 const atlasAdapterReference =
     /agentflow-adapter\b|@atlas[\\/]|\\\\(?:[^\s\\/"'`]+[\\/])+atlas(?:[\\/]|(?=[\s"'`]|$))|\b[A-Za-z]:[\\/](?:[^\s"'`]*[\\/])?atlas(?:[\\/]|(?=[\s"'`]|$))|(?:^|[\s"'`}=])\\?\/(?:[^\s\/"'`]+\\?\/)*atlas(?:\\?\/|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`]atlas(?=["'`])|\bimport\s+["'`]atlas(?=["'`])|(?:^|[\s"'`=])(?:\.{1,2}[\\/])+atlas(?:[\\/]|["'`])|=atlas(?:[\\/]|(?=[\s"'`]|$))|\b(?:require|import)\s*\(\s*["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\bimport\s+["'`][^"'`]*[\\/]atlas(?:[\\/]|["'`])|\b(?:COPY|ADD)\s+(?:(?:\.{1,2})?[\\/])?atlas(?:[\\/\s"'`]|$)|\b(?:COPY|ADD)\s*\[\s*["'`]atlas["'`]|\bcp\s+(?:-[A-Za-z]+\s+)*(?:[^\s"'`]*[\\/])?atlas(?:[\\/\s"'`]|$)|\bworking-directory\s*:\s*(?:\.[\\/])?atlas(?:[\\/\s#]|$)/im
-const makeAtlasAssignmentReference = /^\s*[A-Za-z_][A-Za-z0-9_.-]*\s*(?:\?|:)?=\s*atlas(?:[\\/]|(?=[\s"'`]|$))/im
+const makeAtlasAssignmentReference = /^\s*[A-Za-z_][A-Za-z0-9_.-]*\s*(?:[?!+]|:{1,3})?=\s*atlas(?:[\\/]|(?=[\s"'`]|$))/im
 const nonFilesystemAtlasRegexLiteral = /(^|(?:\breturn|[=(:,\[!&|?;{}]))(\s*)\/atlas\/[dgimsuvy]*(?!\s*\+)(?=[\s),.;}\]<]|$)/gim
 const atlasRegexLiteralTemplatePath = /\$\{\s*\/atlas\/[dgimsuvy]*\}\s*\//im
 const javascriptRuntimeSourceExtensions = new Set(['.cjs', '.cts', '.html', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx', '.vue'])
@@ -441,7 +441,15 @@ test('Flowise containment rejects unquoted bare Atlas paths after shell assignme
 })
 
 test('Flowise containment rejects bare Atlas paths in Make assignments', () => {
-    for (const source of ['ATLAS_DIR = atlas/bridge', 'ATLAS_DIR := atlas/bridge', 'ATLAS_DIR ?= atlas/bridge']) {
+    for (const source of [
+        'ATLAS_DIR = atlas/bridge',
+        'ATLAS_DIR := atlas/bridge',
+        'ATLAS_DIR ::= atlas/bridge',
+        'ATLAS_DIR :::= atlas/bridge',
+        'ATLAS_DIR ?= atlas/bridge',
+        'ATLAS_DIR += atlas/bridge',
+        'ATLAS_DIR != atlas/bridge'
+    ]) {
         assert.throws(() => assertRuntimeSourceDoesNotReferenceAdapter('Makefile', source))
     }
 })
